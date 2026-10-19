@@ -32,3 +32,20 @@ This repository builds a local test harness for backend and AI systems. Its web 
 - Prefer a complete vertical slice over disconnected framework scaffolding.
 - Keep packages independently buildable and avoid circular dependencies.
 
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live in this repository's GitHub Issues. See
+`docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the standard five-label triage vocabulary. See
+`docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository with system-wide ADRs. See
+`docs/agents/domain.md`.
+
