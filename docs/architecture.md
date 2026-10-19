@@ -98,3 +98,15 @@ depth, including for legacy files. CLI, API, and dashboard therefore consume
 the already-redacted evidence rather than hiding secrets only at presentation
 time.
 
+## AI adapter evidence and replay
+
+`@ai-testing-env/adapter-ai` defines the provider-independent AI request and
+response contract. `runAiStep` records model, rendered prompt, messages, tools,
+response schema, provider, adapter mode, output, tool calls, latency, and token
+usage through a normal `ai` Step.
+
+Mocks have no external capabilities. Recording wraps another adapter and saves
+a redacted fixture under a stable SHA-256 key derived from the canonical,
+redacted request. Replay reads that fixture without invoking an external
+transport. Missing and corrupt fixtures fail with dedicated, actionable errors.
+

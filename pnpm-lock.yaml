@@ -24,6 +24,12 @@ importers:
         specifier: workspace:*
         version: link:../../packages/cli
 
+  packages/adapter-ai:
+    dependencies:
+      '@ai-testing-env/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/cli:
     dependencies:
       '@ai-testing-env/core':
