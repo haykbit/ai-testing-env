@@ -6,6 +6,7 @@ export class FileRunRepository implements RunRepository {
   constructor(private readonly directory: string) {}
 
   async save(run: RunTrace): Promise<void> {
+    assertSafeRunId(run.id);
     await mkdir(this.directory, { recursive: true });
     await writeFile(
       join(this.directory, `${run.id}.json`),
@@ -26,6 +27,9 @@ export class FileRunRepository implements RunRepository {
   }
 
   async get(id: string): Promise<RunTrace | undefined> {
+    if (!isSafeRunId(id)) {
+      return undefined;
+    }
     try {
       return await this.read(join(this.directory, `${id}.json`));
     } catch (error) {
@@ -43,5 +47,15 @@ export class FileRunRepository implements RunRepository {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && "code" in error;
+}
+
+function isSafeRunId(id: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(id);
+}
+
+function assertSafeRunId(id: string): void {
+  if (!isSafeRunId(id)) {
+    throw new Error(`Invalid run id: ${id}`);
+  }
 }
 

@@ -172,6 +172,7 @@ describe("FileRunRepository", () => {
     assert.deepEqual(await repository.get(run.id), run);
     assert.deepEqual(await repository.list(), [run]);
     assert.equal(await repository.get("missing"), undefined);
+    assert.equal(await repository.get("../../outside"), undefined);
   });
 });
 
