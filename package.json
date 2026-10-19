@@ -1,0 +1,19 @@
+{
+  "name": "ai-testing-env-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "build": "pnpm --filter './packages/**' build",
+    "test": "pnpm --filter './packages/**' test",
+    "typecheck": "pnpm --filter './packages/**' typecheck",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "dev": "pnpm --filter ai-testing-env dev"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
+

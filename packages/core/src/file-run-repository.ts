@@ -1,0 +1,47 @@
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import type { RunRepository, RunTrace } from "./types.js";
+
+export class FileRunRepository implements RunRepository {
+  constructor(private readonly directory: string) {}
+
+  async save(run: RunTrace): Promise<void> {
+    await mkdir(this.directory, { recursive: true });
+    await writeFile(
+      join(this.directory, `${run.id}.json`),
+      `${JSON.stringify(run, null, 2)}\n`,
+      "utf8",
+    );
+  }
+
+  async list(): Promise<RunTrace[]> {
+    await mkdir(this.directory, { recursive: true });
+    const entries = await readdir(this.directory, { withFileTypes: true });
+    const runs = await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .map(async (entry) => this.read(join(this.directory, entry.name))),
+    );
+    return runs.sort((left, right) => right.startedAt.localeCompare(left.startedAt));
+  }
+
+  async get(id: string): Promise<RunTrace | undefined> {
+    try {
+      return await this.read(join(this.directory, `${id}.json`));
+    } catch (error) {
+      if (isNodeError(error) && error.code === "ENOENT") {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+
+  private async read(path: string): Promise<RunTrace> {
+    return JSON.parse(await readFile(path, "utf8")) as RunTrace;
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
+}
+
