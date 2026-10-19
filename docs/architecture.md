@@ -158,3 +158,16 @@ Traces contain the operation name, statement and redacted parameters, duration,
 rows, and rows affected, while the private resource and credentials stay inside
 the adapter.
 
+## Deterministic reevaluation
+
+A Project can register deterministic Run Evaluations by id. `ai-test reevaluate`
+loads an immutable clone of a stored Trace, applies only the selected
+Evaluations, and saves a new Run-shaped result with `sourceRunId`. It never
+resolves a Flow or invokes a Step or adapter.
+
+The source JSON remains unchanged. The reevaluation contains no Steps, retains
+the source Project/Profile/Flow/Scenario identity, and stores its new Verdict and
+evidence through the same redaction and repository boundary. The API includes
+`sourceRunId` in summaries and the dashboard links each reevaluation back to its
+source Run.
+

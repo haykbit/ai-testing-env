@@ -86,6 +86,7 @@ export interface RunSummary {
   durationMs: number;
   stepCount: number;
   tags: string[];
+  sourceRunId?: string;
 }
 
 export function createDashboardServer(repository: RunRepository): Server {
@@ -208,6 +209,7 @@ function toRunSummary(run: RunTrace): RunSummary {
     durationMs: run.durationMs,
     stepCount: run.steps.length,
     tags: [...run.tags],
+    ...(run.sourceRunId === undefined ? {} : { sourceRunId: run.sourceRunId }),
   };
 }
 
@@ -221,7 +223,7 @@ function renderRunList(runs: readonly RunTrace[]): string {
     ? `<div class="empty">No runs recorded yet. Execute a scenario to see its trace here.</div>`
     : runs.map((run) => `
       <a class="run" href="/runs/${encodeURIComponent(run.id)}">
-        <strong>${escapeHtml(run.scenarioId)}</strong>
+        <strong>${escapeHtml(run.scenarioId)}${run.sourceRunId === undefined ? "" : " · reevaluation"}</strong>
         <span class="secondary muted">${escapeHtml(run.flowId)}</span>
         <span class="pill ${run.status}">${run.status}</span>
         <span class="secondary muted">${formatDuration(run.durationMs)}</span>
@@ -247,11 +249,14 @@ function renderRunDetail(run: RunTrace): string {
   const errorBlock = run.error === undefined
     ? ""
     : `<div class="error"><strong>${escapeHtml(run.error.name)}</strong>: ${escapeHtml(run.error.message)}</div>`;
+  const sourceBlock = run.sourceRunId === undefined
+    ? ""
+    : `<span>Reevaluates <a href="/runs/${encodeURIComponent(run.sourceRunId)}">${escapeHtml(run.sourceRunId)}</a></span>`;
 
   return page(run.scenarioId, `
     <a class="back" href="/">← All runs</a>
     <header class="detail-head"><div><div class="eyebrow">${escapeHtml(run.projectId)} / ${escapeHtml(run.flowId)} / ${escapeHtml(run.profileId)}</div><h1>${escapeHtml(run.scenarioId)}</h1></div><span class="pill ${run.status}">${run.status}</span></header>
-    <div class="meta"><span>Run ${escapeHtml(run.id)}</span><span>${escapeHtml(run.startedAt)}</span><span>${formatDuration(run.durationMs)}</span><span>${run.steps.length} steps</span></div>
+    <div class="meta"><span>Run ${escapeHtml(run.id)}</span>${sourceBlock}<span>${escapeHtml(run.startedAt)}</span><span>${formatDuration(run.durationMs)}</span><span>${run.steps.length} steps</span></div>
     ${errorBlock}<section class="steps" aria-label="Trace steps">${steps}</section>${runEvaluationBlock}
   `);
 }

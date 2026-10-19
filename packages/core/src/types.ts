@@ -93,6 +93,13 @@ export interface RunTrace {
   evaluations: EvaluationResult[];
   error?: SerializedError;
   tags: string[];
+  sourceRunId?: string;
+}
+
+export interface RunEvaluator {
+  id: string;
+  name?: string;
+  evaluate(run: Readonly<RunTrace>): EvaluationResult | Promise<EvaluationResult>;
 }
 
 export interface FlowContext {
@@ -120,6 +127,7 @@ export interface ProjectDefinition {
   flows: readonly FlowDefinition<any, any>[];
   scenarios: readonly ScenarioDefinition<any>[];
   profiles?: readonly ExecutionProfile[];
+  evaluations?: readonly RunEvaluator[];
   allowLive?: boolean;
   redaction?: RedactionConfig;
 }

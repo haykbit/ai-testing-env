@@ -5,6 +5,7 @@ import {
   runProjectSuite,
   type RunSuiteResult,
 } from "./run-project-suite.js";
+import { reevaluateProjectRun } from "./reevaluate-project-run.js";
 
 export interface CliIo {
   stdout: Pick<NodeJS.WriteStream, "write">;
@@ -37,6 +38,18 @@ export async function runCli(
         : { configPath: command.configPath }),
     });
     const runsDirectory = resolve(cwd, command.runsDirectory ?? ".ai-test/runs");
+    if (command.kind === "reevaluate") {
+      const run = await reevaluateProjectRun(
+        project,
+        command.sourceRunId,
+        command.evaluationIds,
+        { runsDirectory },
+      );
+      io.stdout.write(command.json
+        ? `${JSON.stringify({ schemaVersion: 1, run })}\n`
+        : formatReevaluation(run));
+      return run.status === "passed" ? 0 : run.status === "failed" ? 1 : 2;
+    }
     const result = await runProjectSuite(project, command.selector, {
       runsDirectory,
       ...(command.profileId === undefined
@@ -55,6 +68,14 @@ export async function runCli(
 type Command =
   | { kind: "help" }
   | {
+      kind: "reevaluate";
+      sourceRunId: string;
+      evaluationIds: string[];
+      configPath?: string;
+      runsDirectory?: string;
+      json: boolean;
+    }
+  | {
       kind: "run";
       selector: {
         scenarioId?: string;
@@ -72,6 +93,7 @@ function parseCommand(args: readonly string[]): Command {
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
     return { kind: "help" };
   }
+  if (args[0] === "reevaluate") return parseReevaluateCommand(args.slice(1));
   if (args[0] !== "run") {
     throw new Error(`Unknown command: ${args[0]}`);
   }
@@ -131,6 +153,49 @@ function parseCommand(args: readonly string[]): Command {
     ...(runsDirectory === undefined ? {} : { runsDirectory }),
     ...(profileId === undefined ? {} : { profileId }),
     allowLive,
+    json,
+  };
+}
+
+function parseReevaluateCommand(args: readonly string[]): Command {
+  let sourceRunId: string | undefined;
+  const evaluationIds: string[] = [];
+  let configPath: string | undefined;
+  let runsDirectory: string | undefined;
+  let json = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    const value = args[index + 1];
+    if (argument === "--evaluation") {
+      evaluationIds.push(optionValue(argument, value));
+      index += 1;
+    } else if (argument === "--config") {
+      configPath = optionValue(argument, value);
+      index += 1;
+    } else if (argument === "--runs-dir") {
+      runsDirectory = optionValue(argument, value);
+      index += 1;
+    } else if (argument === "--json") {
+      json = true;
+    } else if (argument !== undefined && !argument.startsWith("-") && sourceRunId === undefined) {
+      sourceRunId = argument;
+    } else {
+      throw new Error(`Unknown option: ${argument}`);
+    }
+  }
+  if (sourceRunId === undefined) throw new Error("Select a Run id to reevaluate");
+  if (evaluationIds.length === 0) {
+    throw new Error("Select at least one --evaluation");
+  }
+  if (new Set(evaluationIds).size !== evaluationIds.length) {
+    throw new Error("Evaluation ids must be unique");
+  }
+  return {
+    kind: "reevaluate",
+    sourceRunId,
+    evaluationIds,
+    ...(configPath === undefined ? {} : { configPath }),
+    ...(runsDirectory === undefined ? {} : { runsDirectory }),
     json,
   };
 }
@@ -200,6 +265,19 @@ function formatRun(run: RunTrace): string {
   ].join("\n");
 }
 
+function formatReevaluation(run: RunTrace): string {
+  const marker = run.status === "passed" ? "PASS" : "FAIL";
+  return [
+    `${marker} reevaluation ${run.id} of ${run.sourceRunId}`,
+    ...run.evaluations.map((evaluation) =>
+      `  ${evaluation.passed ? "PASS" : "FAIL"} ${evaluation.name}${
+        evaluation.message === undefined ? "" : ` — ${evaluation.message}`
+      }`
+    ),
+    "",
+  ].join("\n");
+}
+
 function exitCodeFor(result: RunSuiteResult): number {
   if (result.summary.errored > 0) return 2;
   if (result.summary.failed > 0) return 1;
@@ -215,4 +293,5 @@ const helpText = `ai-testing-env
 Usage:
   ai-test run <scenario-id> [--profile <profile-id>] [--allow-live] [--json]
   ai-test run [--flow <flow-id>] [--tag <tag>...] [--profile <profile-id>] [--allow-live] [--json]
+  ai-test reevaluate <run-id> --evaluation <evaluation-id>... [--json]
 `;

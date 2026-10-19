@@ -78,6 +78,29 @@ describe("dashboard server", () => {
     assert.equal(methodResponse.status, 405);
     assert.equal(methodResponse.headers.get("allow"), "GET, HEAD");
   });
+
+  it("exposes reevaluation linkage and evidence in API and dashboard", async () => {
+    const reevaluation = exampleRun({
+      id: "reevaluation-1",
+      sourceRunId: "run-1",
+      steps: [],
+      evaluations: [{ name: "stored rule", passed: false, message: "changed" }],
+      status: "failed",
+      tags: ["mocked", "reevaluation"],
+    });
+    const server = await startServer([reevaluation]);
+
+    const api = await fetch(`${server.url}/api/runs`);
+    const payload = await api.json() as { runs: Array<{ sourceRunId?: string }> };
+    assert.equal(payload.runs[0]?.sourceRunId, "run-1");
+
+    const detail = await fetch(`${server.url}/runs/reevaluation-1`);
+    const html = await detail.text();
+    assert.match(html, /Reevaluates/);
+    assert.match(html, /href="\/runs\/run-1"/);
+    assert.match(html, /stored rule/);
+    assert.match(html, /changed/);
+  });
 });
 
 async function startServer(runs: RunTrace[]): Promise<RunningDashboardServer> {

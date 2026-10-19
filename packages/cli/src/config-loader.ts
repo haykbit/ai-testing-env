@@ -97,6 +97,23 @@ function assertProjectShape(
       throw new Error(`Configuration ${configPath} contains an invalid Scenario`);
     }
   }
+  if (candidate.evaluations !== undefined) {
+    if (!Array.isArray(candidate.evaluations)) {
+      throw new Error(`Configuration ${configPath} evaluations must be an array`);
+    }
+    for (const evaluation of candidate.evaluations) {
+      if (
+        !isRecord(evaluation)
+        || typeof evaluation.id !== "string"
+        || evaluation.id.length === 0
+        || typeof evaluation.evaluate !== "function"
+      ) {
+        throw new Error(
+          `Configuration ${configPath} contains an invalid Evaluation`,
+        );
+      }
+    }
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

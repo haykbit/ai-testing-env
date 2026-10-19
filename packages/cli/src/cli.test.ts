@@ -327,6 +327,62 @@ describe("ai-test run", () => {
       "yes",
     );
   });
+
+  it("reevaluates a stored Run without invoking its Flow or changing its Trace", async () => {
+    const projectDirectory = await createProject(`
+      import { appendFile } from "node:fs/promises";
+      export default {
+        id: "reevaluation-project",
+        flows: [{
+          id: "external-flow",
+          execute: async () => {
+            await appendFile("flow-calls", "called\\n");
+            return "stored output";
+          },
+        }],
+        scenarios: [{ id: "original", flowId: "external-flow", input: null }],
+        evaluations: [{
+          id: "output-is-stored",
+          name: "output remains stored",
+          evaluate: (run: any) => ({
+            name: "ignored",
+            passed: run.output === "stored output",
+            expected: "stored output",
+            actual: run.output,
+          }),
+        }],
+      };
+    `);
+    const executed = await runCliProcess(projectDirectory, ["run", "original"]);
+    assert.equal(executed.code, 0);
+    const source = await onlyStoredRun(projectDirectory);
+    const sourcePath = join(
+      projectDirectory,
+      ".ai-test",
+      "runs",
+      `${source.id}.json`,
+    );
+    const sourceBefore = await readFile(sourcePath, "utf8");
+
+    const reevaluated = await runCliProcess(projectDirectory, [
+      "reevaluate",
+      source.id,
+      "--evaluation",
+      "output-is-stored",
+      "--json",
+    ]);
+
+    assert.equal(reevaluated.code, 0);
+    assert.equal(reevaluated.stderr, "");
+    const payload = JSON.parse(reevaluated.stdout) as { run: RunTrace };
+    assert.equal(payload.run.sourceRunId, source.id);
+    assert.equal(payload.run.status, "passed");
+    assert.deepEqual(payload.run.steps, []);
+    assert.equal(payload.run.evaluations[0]?.name, "output remains stored");
+    assert.equal(await readFile(join(projectDirectory, "flow-calls"), "utf8"), "called\n");
+    assert.equal(await readFile(sourcePath, "utf8"), sourceBefore);
+    assert.equal((await storedRuns(projectDirectory)).length, 2);
+  });
 });
 
 async function createProject(config: string): Promise<string> {

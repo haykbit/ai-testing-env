@@ -21,6 +21,7 @@ export function defineProject(definition: ProjectDefinition): ProjectDefinition 
   const flowIds = new Set<string>();
   const scenarioIds = new Set<string>();
   const profileIds = new Set(builtInProfiles.map((profile) => profile.id));
+  const evaluationIds = new Set<string>();
 
   for (const flow of definition.flows) {
     if (flowIds.has(flow.id)) {
@@ -55,6 +56,19 @@ export function defineProject(definition: ProjectDefinition): ProjectDefinition 
       );
     }
     scenarioIds.add(scenario.id);
+  }
+
+  for (const evaluation of definition.evaluations ?? []) {
+    if (typeof evaluation.id !== "string" || evaluation.id.length === 0) {
+      throw new Error("Evaluation id must be a non-empty string");
+    }
+    if (evaluationIds.has(evaluation.id)) {
+      throw new Error(`Duplicate evaluation id: ${evaluation.id}`);
+    }
+    if (typeof evaluation.evaluate !== "function") {
+      throw new Error(`Evaluation ${evaluation.id} must define evaluate`);
+    }
+    evaluationIds.add(evaluation.id);
   }
 
   return definition;
