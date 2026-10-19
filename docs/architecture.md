@@ -186,3 +186,18 @@ replay makes the judgment reproducible without another paid call. A below-
 threshold judgment yields `failed`; transport, policy, or malformed-judge
 responses yield `errored` evidence instead.
 
+## Dashboard execution control
+
+When started with a loaded Project, the dashboard exposes its Flows, Scenarios,
+Profiles, capability matrix, and live-authorization state. A Scenario launch
+creates an in-memory execution record that moves through `pending`, `running`,
+and a final `completed` or `failed` state. Completed records link to the persisted
+Run.
+
+The server delegates to the CLI's `runProjectScenario` orchestrator with the
+same repository, selected Profile, run id, and live authorization flag. Profile
+resolution, capability checks, redaction, dual live authorization, and Trace
+persistence therefore have no dashboard-specific bypass. Concurrent launches
+of the same Scenario return a conflict while different Scenarios remain
+independent.
+

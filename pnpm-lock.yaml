@@ -62,6 +62,9 @@ importers:
       '@ai-testing-env/core':
         specifier: workspace:*
         version: link:../core
+      ai-testing-env:
+        specifier: workspace:*
+        version: link:../cli
 
 packages:
 

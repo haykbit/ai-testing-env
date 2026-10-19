@@ -13,6 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@ai-testing-env/core": "workspace:*"
+    "@ai-testing-env/core": "workspace:*",
+    "ai-testing-env": "workspace:*"
   }
 }

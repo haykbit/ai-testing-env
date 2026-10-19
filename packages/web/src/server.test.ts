@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import type { RunRepository, RunTrace } from "@ai-testing-env/core";
+import type {
+  ProjectDefinition,
+  RunRepository,
+  RunTrace,
+} from "@ai-testing-env/core";
 import { startDashboardServer, type RunningDashboardServer } from "./server.js";
 
 const servers: RunningDashboardServer[] = [];
@@ -57,7 +61,7 @@ describe("dashboard server", () => {
     assert.match(detailHtml, /mentions testing/);
     assert.equal(
       detailResponse.headers.get("content-security-policy"),
-      "default-src 'self'; style-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+      "default-src 'self'; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'",
     );
   });
 
@@ -100,6 +104,105 @@ describe("dashboard server", () => {
     assert.match(html, /href="\/runs\/run-1"/);
     assert.match(html, /stored rule/);
     assert.match(html, /changed/);
+  });
+
+  it("creates, conflicts, fails, and completes dashboard executions", async () => {
+    const repository = new MemoryRunRepository([]);
+    const completion = deferred<RunTrace>();
+    const started = deferred<void>();
+    let calls = 0;
+    const server = await startDashboardServer({
+      repository,
+      project: dashboardProject(),
+      port: 0,
+      async execute(scenarioId, options) {
+        calls += 1;
+        if (scenarioId === "errors") throw new Error("orchestrator unavailable");
+        started.resolve(undefined);
+        const run = await completion.promise;
+        assert.equal(options.profileId, "integration");
+        assert.equal(options.allowLive, false);
+        await repository.save(run);
+        return run;
+      },
+    });
+    servers.push(server);
+
+    const manifestResponse = await fetch(`${server.url}/api/project`);
+    const manifest = await manifestResponse.json() as {
+      project: {
+        flows: unknown[];
+        scenarios: unknown[];
+        profiles: Array<{
+          id: string;
+          capabilities: Record<string, boolean>;
+          projectAuthorized: boolean;
+        }>;
+      };
+    };
+    assert.equal(manifest.project.flows.length, 1);
+    assert.equal(manifest.project.scenarios.length, 2);
+    assert.equal(
+      manifest.project.profiles.find((profile) => profile.id === "integration")
+        ?.capabilities.network,
+      true,
+    );
+    assert.equal(
+      manifest.project.profiles.find((profile) => profile.id === "live")
+        ?.projectAuthorized,
+      false,
+    );
+
+    const createdResponse = await postJson(`${server.url}/api/executions`, {
+      scenarioId: "passes",
+      profileId: "integration",
+    });
+    assert.equal(createdResponse.status, 202);
+    const created = await createdResponse.json() as {
+      execution: { id: string; runId: string; status: string };
+    };
+    assert.equal(created.execution.status, "pending");
+    await started.promise;
+
+    const running = await fetch(
+      `${server.url}/api/executions/${created.execution.id}`,
+    );
+    assert.equal((await running.json() as { execution: { status: string } }).execution.status, "running");
+
+    const conflict = await postJson(`${server.url}/api/executions`, {
+      scenarioId: "passes",
+      profileId: "integration",
+    });
+    assert.equal(conflict.status, 409);
+
+    completion.resolve(exampleRun({
+      id: created.execution.runId,
+      scenarioId: "passes",
+      profileId: "integration",
+    }));
+    const completed = await waitForExecution(server.url, created.execution.id, "completed");
+    assert.equal(completed.verdict, "passed");
+    assert.equal(calls, 1);
+    assert.equal((await repository.get(created.execution.runId))?.status, "passed");
+
+    const failedResponse = await postJson(`${server.url}/api/executions`, {
+      scenarioId: "errors",
+      profileId: "mocked",
+    });
+    const failedId = (await failedResponse.json() as {
+      execution: { id: string };
+    }).execution.id;
+    const failed = await waitForExecution(server.url, failedId, "failed");
+    assert.equal(failed.error, "orchestrator unavailable");
+
+    const blocked = await postJson(`${server.url}/api/executions`, {
+      scenarioId: "passes",
+      profileId: "live",
+      allowLive: true,
+    });
+    assert.equal(blocked.status, 400);
+    assert.match(JSON.stringify(await blocked.json()), /set allowLive: true/);
+    assert.equal(calls, 2);
   });
 });
 
@@ -165,4 +268,50 @@ function exampleRun(overrides: Partial<RunTrace> = {}): RunTrace {
     tags: ["mocked"],
     ...overrides,
   };
+}
+
+function dashboardProject(): ProjectDefinition {
+  return {
+    id: "dashboard-project",
+    flows: [{ id: "flow", execute: () => "unused" }],
+    scenarios: [
+      { id: "passes", flowId: "flow", input: null },
+      { id: "errors", flowId: "flow", input: null },
+    ],
+  };
+}
+
+function postJson(url: string, body: unknown): Promise<Response> {
+  return fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+async function waitForExecution(
+  baseUrl: string,
+  id: string,
+  expected: "completed" | "failed",
+): Promise<{ status: string; verdict?: string; error?: string }> {
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const response = await fetch(`${baseUrl}/api/executions/${id}`);
+    const execution = (await response.json() as {
+      execution: { status: string; verdict?: string; error?: string };
+    }).execution;
+    if (execution.status === expected) return execution;
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`Execution ${id} did not reach ${expected}`);
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }
