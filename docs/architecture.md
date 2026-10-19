@@ -143,3 +143,18 @@ stable key derived from the canonical redacted request; replay performs no
 network access. Non-2xx statuses remain observable responses, while transport,
 invalid JSON, and missing-fixture failures become Step errors.
 
+## Database effects and cleanup
+
+`@ai-testing-env/adapter-database` wraps a database driver without exposing its
+connection object in a Trace. `withDatabaseResource` records setup and cleanup
+as lifecycle Steps and guarantees cleanup through `finally`, including when the
+tested Flow throws. If both the Flow and cleanup fail, the Run retains a combined
+error and the cleanup Step retains its own error evidence.
+
+Operations explicitly declare `read` or `write`. Integration reads require the
+adapter's base capabilities (normally `network`); writes additionally require
+`write` and are blocked before the driver is invoked when the Profile denies it.
+Traces contain the operation name, statement and redacted parameters, duration,
+rows, and rows affected, while the private resource and credentials stay inside
+the adapter.
+
