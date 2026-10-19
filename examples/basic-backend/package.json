@@ -7,6 +7,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@ai-testing-env/adapter-ai": "workspace:*",
+    "@ai-testing-env/adapter-database": "workspace:*",
+    "@ai-testing-env/adapter-http": "workspace:*",
     "ai-testing-env": "workspace:*"
   }
 }

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { resolve } from "node:path";
 import { FileRunRepository } from "@ai-testing-env/core";
 import { loadProject } from "ai-testing-env";

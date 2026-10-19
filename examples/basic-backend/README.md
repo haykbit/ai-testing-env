@@ -1,5 +1,9 @@
 # Basic backend example
 
+This Project exercises `code`, `ai`, `http`, and `database` Steps with
+deterministic mocks and an ephemeral in-memory database. It never accesses live
+resources by default.
+
 From the repository root, build the workspace and run the configured Scenario:
 
 ```sh
@@ -18,3 +22,6 @@ results for CI:
 ```sh
 pnpm --filter @ai-testing-env/example-basic-backend exec ai-test run --flow publish-content --tag smoke --json
 ```
+
+The persisted Trace contains the content transformation, normalized AI usage,
+HTTP request/response evidence, and database setup/write/cleanup lifecycle.

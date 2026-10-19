@@ -20,6 +20,15 @@ importers:
 
   examples/basic-backend:
     dependencies:
+      '@ai-testing-env/adapter-ai':
+        specifier: workspace:*
+        version: link:../../packages/adapter-ai
+      '@ai-testing-env/adapter-database':
+        specifier: workspace:*
+        version: link:../../packages/adapter-database
+      '@ai-testing-env/adapter-http':
+        specifier: workspace:*
+        version: link:../../packages/adapter-http
       ai-testing-env:
         specifier: workspace:*
         version: link:../../packages/cli

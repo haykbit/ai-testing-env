@@ -1,7 +1,6 @@
 {
   "name": "ai-testing-env",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
   "bin": {
     "ai-test": "./dist/bin.js",
@@ -10,8 +9,14 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "publishConfig": {
+    "access": "public",
+    "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && esbuild src/bin.ts --bundle --platform=node --format=esm --target=node20 --external:tsx --external:tsx/* --outfile=dist/bin.js",
+    "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.build.json && esbuild src/bin.ts --bundle --platform=node --format=esm --target=node20 --external:tsx --external:tsx/* --outfile=dist/bin.js",
     "test": "tsx --test src/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

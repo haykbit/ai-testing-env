@@ -7,7 +7,8 @@
     "build": "pnpm --filter './packages/**' build",
     "test": "pnpm --filter './packages/**' test",
     "typecheck": "pnpm --filter './packages/**' typecheck && pnpm --filter './examples/**' typecheck",
-    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "smoke": "node scripts/package-smoke.mjs",
+    "check": "pnpm typecheck && pnpm test && pnpm build && pnpm smoke",
     "dev": "tilt up"
   },
   "devDependencies": {
