@@ -1,5 +1,10 @@
 import { resolve } from "node:path";
-import type { RunTrace } from "@ai-testing-env/core";
+import {
+  FileRunRepository,
+  type RunQuery,
+  type RunTrace,
+  type Verdict,
+} from "@ai-testing-env/core";
 import { loadProject } from "./config-loader.js";
 import {
   runProjectSuite,
@@ -28,6 +33,17 @@ export async function runCli(
     const command = parseCommand(args);
     if (command.kind === "help") {
       io.stdout.write(helpText);
+      return 0;
+    }
+
+    if (command.kind === "runs") {
+      const repository = new FileRunRepository(
+        resolve(cwd, command.runsDirectory ?? ".ai-test/runs"),
+      );
+      const page = await repository.query(command.query);
+      io.stdout.write(command.json
+        ? `${JSON.stringify({ schemaVersion: 1, ...page })}\n`
+        : formatRunPage(page.runs, page.nextCursor));
       return 0;
     }
 
@@ -74,6 +90,12 @@ export async function runCli(
 type Command =
   | { kind: "help" }
   | {
+      kind: "runs";
+      query: RunQuery;
+      runsDirectory?: string;
+      json: boolean;
+    }
+  | {
       kind: "reevaluate";
       sourceRunId: string;
       evaluationIds: string[];
@@ -102,6 +124,7 @@ function parseCommand(args: readonly string[]): Command {
     return { kind: "help" };
   }
   if (args[0] === "reevaluate") return parseReevaluateCommand(args.slice(1));
+  if (args[0] === "runs") return parseRunsCommand(args.slice(1));
   if (args[0] !== "run") {
     throw new Error(`Unknown command: ${args[0]}`);
   }
@@ -165,6 +188,47 @@ function parseCommand(args: readonly string[]): Command {
   };
 }
 
+function parseRunsCommand(args: readonly string[]): Command {
+  const query: RunQuery & { tags?: string[] } = {};
+  let runsDirectory: string | undefined;
+  let json = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    const value = args[index + 1];
+    if (argument === "--project") {
+      query.projectId = optionValue(argument, value); index += 1;
+    } else if (argument === "--flow") {
+      query.flowId = optionValue(argument, value); index += 1;
+    } else if (argument === "--scenario") {
+      query.scenarioId = optionValue(argument, value); index += 1;
+    } else if (argument === "--verdict") {
+      query.status = verdictValue(optionValue(argument, value)); index += 1;
+    } else if (argument === "--tag") {
+      query.tags = [...(query.tags ?? []), optionValue(argument, value)]; index += 1;
+    } else if (argument === "--from") {
+      query.startedFrom = dateValue(argument, optionValue(argument, value)); index += 1;
+    } else if (argument === "--to") {
+      query.startedTo = dateValue(argument, optionValue(argument, value)); index += 1;
+    } else if (argument === "--limit") {
+      query.limit = numberValue(argument, optionValue(argument, value)); index += 1;
+    } else if (argument === "--cursor") {
+      query.cursor = optionValue(argument, value); index += 1;
+    } else if (argument === "--runs-dir") {
+      runsDirectory = optionValue(argument, value); index += 1;
+    } else if (argument === "--json") {
+      json = true;
+    } else {
+      throw new Error(`Unknown option: ${argument}`);
+    }
+  }
+  return {
+    kind: "runs",
+    query,
+    ...(runsDirectory === undefined ? {} : { runsDirectory }),
+    json,
+  };
+}
+
 function parseReevaluateCommand(args: readonly string[]): Command {
   let sourceRunId: string | undefined;
   const evaluationIds: string[] = [];
@@ -222,6 +286,35 @@ function optionValue(option: string, value: string | undefined): string {
     throw new Error(`Missing value for ${option}`);
   }
   return value;
+}
+
+function verdictValue(value: string): Verdict {
+  if (value !== "passed" && value !== "failed" && value !== "errored") {
+    throw new Error(`Invalid Verdict: ${value}`);
+  }
+  return value;
+}
+
+function dateValue(option: string, value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error(`Invalid date for ${option}: ${value}`);
+  return date.toISOString();
+}
+
+function numberValue(option: string, value: string): number {
+  const number = Number(value);
+  if (!Number.isInteger(number)) throw new Error(`Invalid number for ${option}: ${value}`);
+  return number;
+}
+
+function formatRunPage(runs: readonly RunTrace[], nextCursor?: string): string {
+  return [
+    ...runs.map((run) =>
+      `${run.id}\t${run.status}\t${run.projectId}/${run.flowId}/${run.scenarioId}\t${run.startedAt}`
+    ),
+    ...(nextCursor === undefined ? [] : [`Next cursor: ${nextCursor}`]),
+    "",
+  ].join("\n");
 }
 
 function formatSuite(result: RunSuiteResult): string {
@@ -311,4 +404,5 @@ Usage:
   ai-test run <scenario-id> [--profile <profile-id>] [--allow-live] [--json]
   ai-test run [--flow <flow-id>] [--tag <tag>...] [--profile <profile-id>] [--allow-live] [--json]
   ai-test reevaluate <run-id> --evaluation <evaluation-id>... [--profile <profile-id>] [--allow-live] [--json]
+  ai-test runs [--project <id>] [--flow <id>] [--scenario <id>] [--verdict <status>] [--tag <tag>...] [--from <date>] [--to <date>] [--limit <n>] [--cursor <cursor>] [--json]
 `;

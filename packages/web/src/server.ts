@@ -13,7 +13,9 @@ import type {
   RunTrace,
   StepTrace,
   Verdict,
+  RunQuery,
 } from "@ai-testing-env/core";
+import { compareRuns } from "@ai-testing-env/core";
 import {
   DashboardExecutionController,
   DashboardExecutionRequestError,
@@ -259,8 +261,25 @@ async function routeRequest(
   }
 
   if (url.pathname === "/api/runs") {
-    const runs = await repository.list();
-    sendJson(response, 200, { runs: runs.map(toRunSummary) }, isHead);
+    try {
+      const page = await repository.query(runQueryFromUrl(url));
+      sendJson(response, 200, {
+        runs: page.runs.map(toRunSummary),
+        ...(page.nextCursor === undefined ? {} : { nextCursor: page.nextCursor }),
+      }, isHead);
+    } catch (error) {
+      sendJson(response, 400, { error: errorMessage(error) }, isHead);
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/compare") {
+    const pair = await comparisonPair(repository, url);
+    if ("error" in pair) {
+      sendJson(response, pair.status, { error: pair.error }, isHead);
+      return;
+    }
+    sendJson(response, 200, { comparison: compareRuns(pair.left, pair.right) }, isHead);
     return;
   }
 
@@ -276,13 +295,27 @@ async function routeRequest(
   }
 
   if (url.pathname === "/") {
-    const runs = await repository.list();
-    sendHtml(
-      response,
-      200,
-      renderRunList(runs, controller?.manifest()),
-      isHead,
-    );
+    try {
+      const page = await repository.query(runQueryFromUrl(url));
+      sendHtml(
+        response,
+        200,
+        renderRunList(page.runs, controller?.manifest(), url.searchParams),
+        isHead,
+      );
+    } catch (error) {
+      sendHtml(response, 400, page("Invalid filters", `<div class="error">${escapeHtml(errorMessage(error))}</div>`), isHead);
+    }
+    return;
+  }
+
+  if (url.pathname === "/compare") {
+    const pair = await comparisonPair(repository, url);
+    if ("error" in pair) {
+      sendHtml(response, pair.status, page("Unable to compare", `<a class="back" href="/">← All runs</a><div class="error">${escapeHtml(pair.error)}</div>`), isHead);
+      return;
+    }
+    sendHtml(response, 200, renderComparison(compareRuns(pair.left, pair.right)), isHead);
     return;
   }
 
@@ -331,6 +364,7 @@ function toRunSummary(run: RunTrace): RunSummary {
 function renderRunList(
   runs: readonly RunTrace[],
   project?: DashboardProjectManifest,
+  searchParams = new URLSearchParams(),
 ): string {
   const counts = {
     passed: runs.filter((run) => run.status === "passed").length,
@@ -351,11 +385,38 @@ function renderRunList(
   return page("Runs", `
     <header><div class="eyebrow">ai-testing-env</div><h1>Run evidence</h1>
       <p class="lede">Inspect backend and AI workflow traces from the local run repository. Every verdict links back to the captured steps and evaluations.</p></header>
-    ${controls}<section class="summary" aria-label="Run summary">
+    ${controls}${renderRunFilters(searchParams)}${renderCompareForm(runs)}<section class="summary" aria-label="Run summary">
       ${metric("Total", runs.length)}${metric("Passed", counts.passed)}${metric("Failed", counts.failed)}${metric("Errored", counts.errored)}
     </section>
     <section class="panel"><div class="panel-header"><h2>Recent runs</h2><span class="muted">Newest first</span></div><div class="run-list">${runRows}</div></section>
   `);
+}
+
+function renderRunFilters(searchParams: URLSearchParams): string {
+  return `<form class="panel launch-form" method="get" action="/" aria-label="Filter Runs">
+    <label>Project<input name="project" value="${escapeHtml(searchParams.get("project") ?? "")}"></label>
+    <label>Flow<input name="flow" value="${escapeHtml(searchParams.get("flow") ?? "")}"></label>
+    <label>Scenario<input name="scenario" value="${escapeHtml(searchParams.get("scenario") ?? "")}"></label>
+    <label>Verdict<select name="verdict"><option value="">any</option>${["passed", "failed", "errored"].map((status) => `<option value="${status}"${searchParams.get("verdict") === status ? " selected" : ""}>${status}</option>`).join("")}</select></label>
+    <label>Tag<input name="tag" value="${escapeHtml(searchParams.get("tag") ?? "")}"></label>
+    <label>From<input type="datetime-local" name="from"></label><label>To<input type="datetime-local" name="to"></label><button type="submit">Filter</button>
+  </form>`;
+}
+
+function renderCompareForm(runs: readonly RunTrace[]): string {
+  if (runs.length < 2) return "";
+  const options = runs.map((run) =>
+    `<option value="${escapeHtml(run.id)}">${escapeHtml(run.id)} · ${escapeHtml(run.scenarioId)}</option>`
+  ).join("");
+  return `<form class="panel launch-form" method="get" action="/compare" aria-label="Compare Runs"><label>Before<select name="left">${options}</select></label><label>After<select name="right">${options}</select></label><button type="submit">Compare</button></form>`;
+}
+
+function renderComparison(comparison: ReturnType<typeof compareRuns>): string {
+  return page("Run comparison", `<a class="back" href="/">← All runs</a><header><div class="eyebrow">${escapeHtml(comparison.leftRunId)} → ${escapeHtml(comparison.rightRunId)}</div><h1>Run comparison</h1><p class="lede">${comparison.compatible ? "Compatible Project, Flow, and Scenario." : "Warning: these Runs have different identities."}</p></header>
+    <section class="panel step"><h3>Output</h3>${renderPayload("Change", comparison.output)}</section>
+    <section class="panel step"><h3>Duration and tokens</h3><div class="payload-grid">${renderPayload("Duration", comparison.duration)}${renderPayload("Tokens", comparison.tokens)}</div></section>
+    <section class="panel step"><h3>Steps</h3>${renderPayload("Changes", comparison.steps)}</section>
+    <section class="panel step"><h3>Evaluations</h3>${renderPayload("Changes", comparison.evaluations)}</section>`);
 }
 
 function renderExecutionControls(project: DashboardProjectManifest): string {
@@ -490,6 +551,75 @@ async function readExecutionRequest(
     ...(value.profileId === undefined ? {} : { profileId: value.profileId }),
     ...(value.allowLive === undefined ? {} : { allowLive: value.allowLive }),
   };
+}
+
+function runQueryFromUrl(url: URL): RunQuery {
+  const value = (name: string): string | undefined => {
+    const entry = url.searchParams.get(name);
+    return entry === null || entry.length === 0 ? undefined : entry;
+  };
+  const verdict = value("verdict");
+  if (
+    verdict !== undefined
+    && verdict !== "passed"
+    && verdict !== "failed"
+    && verdict !== "errored"
+  ) throw new Error(`Invalid Verdict: ${verdict}`);
+  const limitValue = value("limit");
+  const limit = limitValue === undefined ? undefined : Number(limitValue);
+  if (limit !== undefined && !Number.isInteger(limit)) {
+    throw new Error(`Invalid limit: ${limitValue}`);
+  }
+  const tags = url.searchParams.getAll("tag").filter((tag) => tag.length > 0);
+  const projectId = value("project");
+  const flowId = value("flow");
+  const scenarioId = value("scenario");
+  const startedFrom = value("from");
+  const startedTo = value("to");
+  const cursor = value("cursor");
+  return {
+    ...(projectId === undefined ? {} : { projectId }),
+    ...(flowId === undefined ? {} : { flowId }),
+    ...(scenarioId === undefined ? {} : { scenarioId }),
+    ...(verdict === undefined ? {} : { status: verdict }),
+    ...(tags.length === 0 ? {} : { tags }),
+    ...(startedFrom === undefined ? {} : { startedFrom: normalizedDate("from", startedFrom) }),
+    ...(startedTo === undefined ? {} : { startedTo: normalizedDate("to", startedTo) }),
+    ...(cursor === undefined ? {} : { cursor }),
+    ...(limit === undefined ? {} : { limit }),
+  };
+}
+
+function normalizedDate(name: string, value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error(`Invalid ${name} date: ${value}`);
+  return date.toISOString();
+}
+
+async function comparisonPair(
+  repository: RunRepository,
+  url: URL,
+): Promise<
+  | { left: RunTrace; right: RunTrace }
+  | { status: 400 | 404; error: string }
+> {
+  const leftId = url.searchParams.get("left");
+  const rightId = url.searchParams.get("right");
+  if (!leftId || !rightId) {
+    return { status: 400, error: "Select left and right Run ids" };
+  }
+  const [left, right] = await Promise.all([
+    repository.get(leftId),
+    repository.get(rightId),
+  ]);
+  if (left === undefined || right === undefined) {
+    return { status: 404, error: "One or both Runs were not found" };
+  }
+  return { left, right };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function sendJson(response: ServerResponse, status: number, value: unknown, headOnly = false): void {

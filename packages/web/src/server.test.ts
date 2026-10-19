@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import type {
   ProjectDefinition,
+  RunPage,
+  RunQuery,
   RunRepository,
   RunTrace,
 } from "@ai-testing-env/core";
@@ -104,6 +106,51 @@ describe("dashboard server", () => {
     assert.match(html, /href="\/runs\/run-1"/);
     assert.match(html, /stored rule/);
     assert.match(html, /changed/);
+  });
+
+  it("shares filtered Run queries and safe comparison through API and dashboard", async () => {
+    const left = exampleRun({
+      id: "left",
+      output: { answer: "before" },
+      tags: ["smoke", "api"],
+    });
+    const right = exampleRun({
+      id: "right",
+      output: { answer: "after" },
+      tags: ["smoke", "api"],
+      durationMs: 40,
+    });
+    const unrelated = exampleRun({
+      id: "unrelated",
+      flowId: "other",
+      tags: ["slow"],
+    });
+    const server = await startServer([left, right, unrelated]);
+
+    const filtered = await fetch(
+      `${server.url}/api/runs?project=example-backend&flow=answer-question&tag=smoke&tag=api&verdict=passed`,
+    );
+    assert.deepEqual(
+      (await filtered.json() as { runs: Array<{ id: string }> }).runs.map((run) => run.id),
+      ["left", "right"],
+    );
+
+    const comparisonResponse = await fetch(
+      `${server.url}/api/compare?left=left&right=right`,
+    );
+    const comparison = (await comparisonResponse.json() as {
+      comparison: { compatible: boolean; output: { changed: boolean } };
+    }).comparison;
+    assert.equal(comparison.compatible, true);
+    assert.equal(comparison.output.changed, true);
+
+    const dashboard = await fetch(
+      `${server.url}/compare?left=left&right=right`,
+    );
+    const html = await dashboard.text();
+    assert.match(html, /Run comparison/);
+    assert.match(html, /before/);
+    assert.match(html, /after/);
   });
 
   it("creates, conflicts, fails, and completes dashboard executions", async () => {
@@ -231,6 +278,18 @@ class MemoryRunRepository implements RunRepository {
   async get(id: string): Promise<RunTrace | undefined> {
     this.requestedIds.push(id);
     return this.runs.find((run) => run.id === id);
+  }
+
+  async query(query: RunQuery = {}): Promise<RunPage> {
+    return {
+      runs: this.runs.filter((run) =>
+        (query.projectId === undefined || run.projectId === query.projectId)
+        && (query.flowId === undefined || run.flowId === query.flowId)
+        && (query.scenarioId === undefined || run.scenarioId === query.scenarioId)
+        && (query.status === undefined || run.status === query.status)
+        && (query.tags ?? []).every((tag) => run.tags.includes(tag))
+      ).slice(0, query.limit ?? 50),
+    };
   }
 }
 

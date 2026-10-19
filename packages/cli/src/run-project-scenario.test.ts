@@ -5,6 +5,8 @@ import {
   defineProject,
   defineScenario,
   type RunRepository,
+  type RunPage,
+  type RunQuery,
   type RunTrace,
 } from "@ai-testing-env/core";
 import { runProjectScenario } from "./run-project-scenario.js";
@@ -77,5 +79,9 @@ class SpyRunRepository implements RunRepository {
 
   async get(id: string): Promise<RunTrace | undefined> {
     return this.saved?.id === id ? this.saved : undefined;
+  }
+
+  async query(_query?: RunQuery): Promise<RunPage> {
+    return { runs: this.saved === undefined ? [] : [this.saved] };
   }
 }

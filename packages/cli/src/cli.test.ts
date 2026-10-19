@@ -383,6 +383,36 @@ describe("ai-test run", () => {
     assert.equal(await readFile(sourcePath, "utf8"), sourceBefore);
     assert.equal((await storedRuns(projectDirectory)).length, 2);
   });
+
+  it("filters and paginates stored Runs without loading Project code", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ai-testing-env-runs-"));
+    temporaryDirectories.push(directory);
+    const repository = new FileRunRepository(join(directory, ".ai-test", "runs"));
+    await repository.save(queryRun("a", "2026-10-19T10:00:00.000Z", ["smoke", "api"]));
+    await repository.save(queryRun("b", "2026-10-19T09:00:00.000Z", ["smoke", "api"]));
+    await repository.save(queryRun("c", "2026-10-19T08:00:00.000Z", ["slow"]));
+
+    const first = await runCliProcess(directory, [
+      "runs", "--project", "query-project", "--tag", "smoke",
+      "--tag", "api", "--verdict", "passed", "--limit", "1", "--json",
+    ]);
+    assert.equal(first.code, 0);
+    const page = JSON.parse(first.stdout) as {
+      runs: RunTrace[];
+      nextCursor?: string;
+    };
+    assert.deepEqual(page.runs.map((run) => run.id), ["a"]);
+    assert.ok(page.nextCursor);
+
+    const second = await runCliProcess(directory, [
+      "runs", "--project", "query-project", "--tag", "smoke",
+      "--cursor", page.nextCursor!, "--limit", "1", "--json",
+    ]);
+    assert.deepEqual(
+      (JSON.parse(second.stdout) as { runs: RunTrace[] }).runs.map((run) => run.id),
+      ["b"],
+    );
+  });
 });
 
 async function createProject(config: string): Promise<string> {
@@ -439,4 +469,23 @@ function runCliProcess(cwd: string, args: readonly string[]): Promise<ProcessRes
     child.once("error", reject);
     child.once("close", (code) => resolve({ code, stdout, stderr }));
   });
+}
+
+function queryRun(id: string, startedAt: string, tags: string[]): RunTrace {
+  return {
+    schemaVersion: 1,
+    id,
+    projectId: "query-project",
+    profileId: "mocked",
+    flowId: "query-flow",
+    scenarioId: "query-scenario",
+    status: "passed",
+    startedAt,
+    finishedAt: startedAt,
+    durationMs: 0,
+    input: null,
+    steps: [],
+    evaluations: [],
+    tags,
+  };
 }

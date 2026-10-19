@@ -140,5 +140,23 @@ export interface RunRepository {
   save(run: RunTrace): Promise<void>;
   list(): Promise<RunTrace[]>;
   get(id: string): Promise<RunTrace | undefined>;
+  query(query?: RunQuery): Promise<RunPage>;
+}
+
+export interface RunQuery {
+  projectId?: string;
+  flowId?: string;
+  scenarioId?: string;
+  status?: Verdict;
+  tags?: readonly string[];
+  startedFrom?: string;
+  startedTo?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+export interface RunPage {
+  runs: RunTrace[];
+  nextCursor?: string;
 }
 

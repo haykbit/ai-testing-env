@@ -201,3 +201,16 @@ persistence therefore have no dashboard-specific bypass. Concurrent launches
 of the same Scenario return a conflict while different Scenarios remain
 independent.
 
+## Run queries and comparison
+
+RunRepository queries combine Project, Flow, Scenario, Verdict, all-of tags,
+and inclusive start-date bounds. Results use a stable newest-first order with
+Run id as the tie-breaker and an opaque keyset cursor; pages are limited to
+1–100 items. CLI, API, and dashboard pass the same query model to the
+repository.
+
+Run comparison is read-only and reports identity compatibility, present or
+missing output values, added/removed/changed Steps and Evaluations, duration
+delta, and recursively observed total-token changes. Both the JSON API and HTML
+view operate on already-redacted stored Traces and never modify either Run.
+

@@ -1,3 +1,4 @@
+export * from "./compare-runs.js";
 export * from "./definitions.js";
 export * from "./evaluators.js";
 export * from "./file-run-repository.js";
