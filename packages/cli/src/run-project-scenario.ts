@@ -1,5 +1,6 @@
 import {
   FileRunRepository,
+  resolveExecutionProfile,
   runScenario,
   type ProjectDefinition,
   type RunRepository,
@@ -10,6 +11,7 @@ export interface RunProjectScenarioOptions {
   repository?: RunRepository;
   runsDirectory?: string;
   runId?: string;
+  profileId?: string;
 }
 
 export async function runProjectScenario(
@@ -30,6 +32,10 @@ export async function runProjectScenario(
 
   const run = await runScenario(flow, scenario, {
     projectId: project.id,
+    profile: resolveExecutionProfile(
+      project,
+      options.profileId ?? scenario.profileId,
+    ),
     ...(options.runId === undefined ? {} : { runId: options.runId }),
   });
   const repository = options.repository ?? new FileRunRepository(

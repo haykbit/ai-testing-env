@@ -21,6 +21,7 @@ describe("dashboard server", () => {
         {
           id: run.id,
           projectId: run.projectId,
+          profileId: run.profileId,
           flowId: run.flowId,
           scenarioId: run.scenarioId,
           status: run.status,
@@ -112,6 +113,7 @@ function exampleRun(overrides: Partial<RunTrace> = {}): RunTrace {
     schemaVersion: 1,
     id: "run-1",
     projectId: "example-backend",
+    profileId: "mocked",
     flowId: "answer-question",
     scenarioId: "happy-path",
     status: "passed",
@@ -133,6 +135,7 @@ function exampleRun(overrides: Partial<RunTrace> = {}): RunTrace {
         output: "Testing makes AI behavior observable.",
         metadata: { model: "deterministic-test-model" },
         evaluations: [{ name: "mentions testing", passed: true }],
+        capabilities: [],
       },
     ],
     evaluations: [],

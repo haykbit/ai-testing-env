@@ -42,6 +42,7 @@ const happyPath = defineScenario({
   flowId: publish.id,
   input: { topic: "AI testing" },
   tags: ["mocked", "smoke"],
+  profileId: "mocked",
 });
 
 export default defineProject({

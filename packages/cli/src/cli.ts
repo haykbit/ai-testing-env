@@ -39,6 +39,9 @@ export async function runCli(
     const runsDirectory = resolve(cwd, command.runsDirectory ?? ".ai-test/runs");
     const result = await runProjectSuite(project, command.selector, {
       runsDirectory,
+      ...(command.profileId === undefined
+        ? {}
+        : { profileId: command.profileId }),
     });
     io.stdout.write(command.json ? formatJson(result) : formatSuite(result));
     return exitCodeFor(result);
@@ -59,6 +62,7 @@ type Command =
       };
       configPath?: string;
       runsDirectory?: string;
+      profileId?: string;
       json: boolean;
     };
 
@@ -75,6 +79,7 @@ function parseCommand(args: readonly string[]): Command {
   const tags: string[] = [];
   let configPath: string | undefined;
   let runsDirectory: string | undefined;
+  let profileId: string | undefined;
   let json = false;
   for (let index = 1; index < args.length; index += 1) {
     const argument = args[index];
@@ -90,6 +95,9 @@ function parseCommand(args: readonly string[]): Command {
       index += 1;
     } else if (argument === "--runs-dir") {
       runsDirectory = optionValue(argument, value);
+      index += 1;
+    } else if (argument === "--profile") {
+      profileId = optionValue(argument, value);
       index += 1;
     } else if (argument === "--json") {
       json = true;
@@ -116,6 +124,7 @@ function parseCommand(args: readonly string[]): Command {
     },
     ...(configPath === undefined ? {} : { configPath }),
     ...(runsDirectory === undefined ? {} : { runsDirectory }),
+    ...(profileId === undefined ? {} : { profileId }),
     json,
   };
 }
@@ -142,6 +151,7 @@ function formatJson(result: RunSuiteResult): string {
     runs: result.runs.map((run) => ({
       id: run.id,
       projectId: run.projectId,
+      profileId: run.profileId,
       flowId: run.flowId,
       scenarioId: run.scenarioId,
       status: run.status,
@@ -175,7 +185,7 @@ function formatRun(run: RunTrace): string {
     ? [`  ERROR run — ${run.error.message}`]
     : [];
   return [
-    `${marker} ${run.scenarioId} (${run.durationMs} ms)`,
+    `${marker} ${run.scenarioId} [${run.profileId}] (${run.durationMs} ms)`,
     `Run ${run.id}`,
     ...details,
     ...runEvaluationDetails,
@@ -197,6 +207,6 @@ function errorMessage(error: unknown): string {
 const helpText = `ai-testing-env
 
 Usage:
-  ai-test run <scenario-id> [--json] [--config <path>] [--runs-dir <path>]
-  ai-test run [--flow <flow-id>] [--tag <tag>...] [--json]
+  ai-test run <scenario-id> [--profile <profile-id>] [--json]
+  ai-test run [--flow <flow-id>] [--tag <tag>...] [--profile <profile-id>] [--json]
 `;

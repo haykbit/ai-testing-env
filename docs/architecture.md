@@ -72,3 +72,16 @@ the HTML dashboard and a read-only API:
 - `GET /api/runs` returns compact run summaries.
 - `GET /api/runs/:id` returns one complete stored trace.
 
+## Execution Profiles
+
+Every Run uses a named Profile. Built-in Profiles are `mocked`, `recorded`,
+`integration`, and `live`. Steps declare the capabilities they require:
+`network`, `write`, or `spend`. The runner checks those capabilities before it
+invokes the Step operation and records a policy error in the Trace when the
+Profile denies them.
+
+`mocked` and `recorded` deny all external capabilities. `integration` permits
+network access but denies writes and spend. `live` is the only built-in Profile
+that can permit all three; provider-specific live operations add their own
+explicit authorization requirements.
+

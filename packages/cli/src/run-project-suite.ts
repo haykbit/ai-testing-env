@@ -16,6 +16,7 @@ export interface ScenarioSelector {
 export interface RunProjectSuiteOptions {
   repository?: RunRepository;
   runsDirectory?: string;
+  profileId?: string;
 }
 
 export interface RunSuiteSummary {
@@ -43,7 +44,12 @@ export async function runProjectSuite(
 
   for (const scenario of scenarios) {
     runs.push(
-      await runProjectScenario(project, scenario.id, { repository }),
+      await runProjectScenario(project, scenario.id, {
+        repository,
+        ...(options.profileId === undefined
+          ? {}
+          : { profileId: options.profileId }),
+      }),
     );
   }
 

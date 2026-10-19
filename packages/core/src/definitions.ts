@@ -3,6 +3,7 @@ import type {
   ProjectDefinition,
   ScenarioDefinition,
 } from "./types.js";
+import { builtInProfiles, defineProfile } from "./profiles.js";
 
 export function defineFlow<TInput, TOutput>(
   definition: FlowDefinition<TInput, TOutput>,
@@ -19,12 +20,21 @@ export function defineScenario<TInput>(
 export function defineProject(definition: ProjectDefinition): ProjectDefinition {
   const flowIds = new Set<string>();
   const scenarioIds = new Set<string>();
+  const profileIds = new Set(builtInProfiles.map((profile) => profile.id));
 
   for (const flow of definition.flows) {
     if (flowIds.has(flow.id)) {
       throw new Error(`Duplicate flow id: ${flow.id}`);
     }
     flowIds.add(flow.id);
+  }
+
+  for (const profile of definition.profiles ?? []) {
+    defineProfile(profile);
+    if (profileIds.has(profile.id)) {
+      throw new Error(`Duplicate profile id: ${profile.id}`);
+    }
+    profileIds.add(profile.id);
   }
 
   for (const scenario of definition.scenarios) {
@@ -34,6 +44,14 @@ export function defineProject(definition: ProjectDefinition): ProjectDefinition 
     if (!flowIds.has(scenario.flowId)) {
       throw new Error(
         `Scenario ${scenario.id} references unknown flow ${scenario.flowId}`,
+      );
+    }
+    if (
+      scenario.profileId !== undefined
+      && !profileIds.has(scenario.profileId)
+    ) {
+      throw new Error(
+        `Scenario ${scenario.id} references unknown profile ${scenario.profileId}`,
       );
     }
     scenarioIds.add(scenario.id);

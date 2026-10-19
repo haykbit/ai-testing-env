@@ -2,6 +2,22 @@ export type StepKind = "ai" | "code" | "http" | "database";
 
 export type Verdict = "passed" | "failed" | "errored";
 
+export type ResourceCapability = "network" | "write" | "spend";
+
+export type ProfileMode = "mocked" | "recorded" | "integration" | "live";
+
+export interface ResourcePolicy {
+  network: boolean;
+  write: boolean;
+  spend: boolean;
+}
+
+export interface ExecutionProfile {
+  id: string;
+  mode: ProfileMode;
+  capabilities: ResourcePolicy;
+}
+
 export interface EvaluationResult {
   name: string;
   passed: boolean;
@@ -29,6 +45,7 @@ export interface StepDefinition<T> {
   input?: unknown;
   metadata?: Record<string, unknown>;
   evaluators?: readonly Evaluator<T>[];
+  capabilities?: readonly ResourceCapability[];
 }
 
 export interface StepTrace {
@@ -43,6 +60,7 @@ export interface StepTrace {
   output?: unknown;
   metadata: Record<string, unknown>;
   evaluations: EvaluationResult[];
+  capabilities: ResourceCapability[];
   error?: SerializedError;
 }
 
@@ -56,6 +74,7 @@ export interface RunTrace {
   schemaVersion: 1;
   id: string;
   projectId: string;
+  profileId: string;
   flowId: string;
   scenarioId: string;
   status: Verdict;
@@ -87,12 +106,14 @@ export interface ScenarioDefinition<TInput = unknown> {
   flowId: string;
   input: TInput;
   tags?: readonly string[];
+  profileId?: string;
 }
 
 export interface ProjectDefinition {
   id: string;
   flows: readonly FlowDefinition<any, any>[];
   scenarios: readonly ScenarioDefinition<any>[];
+  profiles?: readonly ExecutionProfile[];
 }
 
 export interface RunRepository {

@@ -41,7 +41,15 @@ export class FileRunRepository implements RunRepository {
   }
 
   private async read(path: string): Promise<RunTrace> {
-    return JSON.parse(await readFile(path, "utf8")) as RunTrace;
+    const stored = JSON.parse(await readFile(path, "utf8")) as RunTrace;
+    return {
+      ...stored,
+      profileId: stored.profileId ?? "mocked",
+      steps: stored.steps.map((step) => ({
+        ...step,
+        capabilities: step.capabilities ?? [],
+      })),
+    };
   }
 }
 

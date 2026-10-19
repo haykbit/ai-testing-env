@@ -78,6 +78,7 @@ export interface RunningDashboardServer {
 export interface RunSummary {
   id: string;
   projectId: string;
+  profileId: string;
   flowId: string;
   scenarioId: string;
   status: Verdict;
@@ -199,6 +200,7 @@ function toRunSummary(run: RunTrace): RunSummary {
   return {
     id: run.id,
     projectId: run.projectId,
+    profileId: run.profileId,
     flowId: run.flowId,
     scenarioId: run.scenarioId,
     status: run.status,
@@ -248,7 +250,7 @@ function renderRunDetail(run: RunTrace): string {
 
   return page(run.scenarioId, `
     <a class="back" href="/">← All runs</a>
-    <header class="detail-head"><div><div class="eyebrow">${escapeHtml(run.projectId)} / ${escapeHtml(run.flowId)}</div><h1>${escapeHtml(run.scenarioId)}</h1></div><span class="pill ${run.status}">${run.status}</span></header>
+    <header class="detail-head"><div><div class="eyebrow">${escapeHtml(run.projectId)} / ${escapeHtml(run.flowId)} / ${escapeHtml(run.profileId)}</div><h1>${escapeHtml(run.scenarioId)}</h1></div><span class="pill ${run.status}">${run.status}</span></header>
     <div class="meta"><span>Run ${escapeHtml(run.id)}</span><span>${escapeHtml(run.startedAt)}</span><span>${formatDuration(run.durationMs)}</span><span>${run.steps.length} steps</span></div>
     ${errorBlock}<section class="steps" aria-label="Trace steps">${steps}</section>${runEvaluationBlock}
   `);

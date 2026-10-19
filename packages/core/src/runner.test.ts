@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
@@ -173,6 +173,46 @@ describe("FileRunRepository", () => {
     assert.deepEqual(await repository.list(), [run]);
     assert.equal(await repository.get("missing"), undefined);
     assert.equal(await repository.get("../../outside"), undefined);
+  });
+
+  it("supplies safe Profile defaults when reading schema-v1 legacy Traces", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ai-test-runs-"));
+    temporaryDirectories.push(directory);
+    const repository = new FileRunRepository(directory);
+    await writeFile(
+      join(directory, "legacy-run.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        id: "legacy-run",
+        projectId: "legacy-project",
+        flowId: "legacy-flow",
+        scenarioId: "legacy-scenario",
+        status: "passed",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:00.001Z",
+        durationMs: 1,
+        input: null,
+        steps: [{
+          id: "legacy-step",
+          name: "legacy-step",
+          kind: "code",
+          status: "passed",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          finishedAt: "2026-01-01T00:00:00.001Z",
+          durationMs: 1,
+          metadata: {},
+          evaluations: [],
+        }],
+        evaluations: [],
+        tags: [],
+      }),
+      "utf8",
+    );
+
+    const run = await repository.get("legacy-run");
+
+    assert.equal(run?.profileId, "mocked");
+    assert.deepEqual(run?.steps[0]?.capabilities, []);
   });
 });
 

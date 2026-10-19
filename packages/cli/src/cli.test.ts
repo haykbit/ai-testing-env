@@ -166,6 +166,7 @@ describe("ai-test run", () => {
       "durationMs",
       "flowId",
       "id",
+      "profileId",
       "projectId",
       "scenarioId",
       "status",
@@ -211,6 +212,48 @@ describe("ai-test run", () => {
     assert.deepEqual(
       (await storedRuns(projectDirectory)).map((run) => run.status).sort(),
       ["errored", "passed"],
+    );
+  });
+
+  it("selects a Profile and blocks denied capabilities before execution", async () => {
+    const projectDirectory = await createProject(`
+      export default {
+        id: "profile-project",
+        flows: [{
+          id: "request",
+          execute: (context: any) => context.step(
+            { id: "http-request", kind: "http", capabilities: ["network"] },
+            () => "response",
+          ),
+        }],
+        scenarios: [{
+          id: "recorded-default",
+          flowId: "request",
+          input: null,
+          profileId: "recorded",
+        }],
+      };
+    `);
+
+    const blocked = await runCliProcess(projectDirectory, [
+      "run",
+      "recorded-default",
+    ]);
+    assert.equal(blocked.code, 2);
+    assert.match(blocked.stdout, /Profile recorded does not allow: network/);
+
+    const allowed = await runCliProcess(projectDirectory, [
+      "run",
+      "recorded-default",
+      "--profile",
+      "integration",
+    ]);
+    assert.equal(allowed.code, 0);
+    assert.match(allowed.stdout, /PASS recorded-default \[integration\]/);
+
+    assert.deepEqual(
+      (await storedRuns(projectDirectory)).map((run) => run.profileId).sort(),
+      ["integration", "recorded"],
     );
   });
 });

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   EvaluationResult,
   Evaluator,
+  ExecutionProfile,
   FlowDefinition,
   RunTrace,
   ScenarioDefinition,
@@ -9,11 +10,16 @@ import type {
   StepTrace,
   Verdict,
 } from "./types.js";
+import {
+  assertCapabilitiesAllowed,
+  defaultExecutionProfile,
+} from "./profiles.js";
 
 export interface RunOptions {
   projectId: string;
   runId?: string;
   now?: () => Date;
+  profile?: ExecutionProfile;
 }
 
 async function runEvaluators<T>(
@@ -59,6 +65,7 @@ export async function runScenario<TInput, TOutput>(
   options: RunOptions,
 ): Promise<RunTrace> {
   const now = options.now ?? (() => new Date());
+  const profile = options.profile ?? defaultExecutionProfile;
   const startedAt = now();
   const steps: StepTrace[] = [];
   let output: TOutput | undefined;
@@ -71,7 +78,9 @@ export async function runScenario<TInput, TOutput>(
         async step(definition, operation) {
           const stepStartedAt = now();
           const metadata = { ...definition.metadata };
+          const capabilities = [...(definition.capabilities ?? [])];
           try {
+            assertCapabilitiesAllowed(profile, capabilities);
             const value = await operation();
             const stepEvaluations = await runEvaluators(
               definition.evaluators ?? [],
@@ -92,6 +101,7 @@ export async function runScenario<TInput, TOutput>(
               output: value,
               metadata,
               evaluations: stepEvaluations,
+              capabilities,
             });
             return value;
           } catch (stepError) {
@@ -107,6 +117,7 @@ export async function runScenario<TInput, TOutput>(
               ...(definition.input === undefined ? {} : { input: definition.input }),
               metadata,
               evaluations: [],
+              capabilities,
               error: serializeError(stepError),
             });
             throw stepError;
@@ -137,6 +148,7 @@ export async function runScenario<TInput, TOutput>(
     schemaVersion: 1,
     id: options.runId ?? randomUUID(),
     projectId: options.projectId,
+    profileId: profile.id,
     flowId: flow.id,
     scenarioId: scenario.id,
     status,
