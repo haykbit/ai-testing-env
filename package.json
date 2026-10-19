@@ -8,7 +8,7 @@
     "test": "pnpm --filter './packages/**' test",
     "typecheck": "pnpm --filter './packages/**' typecheck",
     "check": "pnpm typecheck && pnpm test && pnpm build",
-    "dev": "pnpm --filter ai-testing-env dev"
+    "dev": "tilt up"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

@@ -47,11 +47,28 @@ Explicitly unsupported targets:
 ## Planned layers
 
 - `@ai-testing-env/core`: domain model, runner, evaluators, and run storage.
-- `@ai-testing-env/web`: read-only local dashboard and HTTP API.
+- `@ai-testing-env/web`: read-only local dashboard and HTTP API. The dashboard
+  renders directly from `RunRepository`, so it never needs to execute a flow or
+  inspect hidden runner state.
 - `ai-testing-env`: installable CLI and configuration loader.
 - adapters: provider and infrastructure-specific instrumentation added as separate packages when needed.
 
 ## Configuration discovery
 
 Initialization has two stages. A deterministic scanner inventories languages, model SDKs, prompts, schemas, endpoints, database clients, and existing test tools. An optional agent then turns that inventory into a proposed configuration. The proposal is reviewed and saved; normal test runs do not require project rediscovery.
+
+## Local dashboard
+
+Tilt owns the local development server and watches the core and web sources.
+Run it from the workspace root:
+
+```sh
+tilt up
+```
+
+The dashboard reads `.ai-test/runs`, binds to `127.0.0.1:4317`, and exposes both
+the HTML dashboard and a read-only API:
+
+- `GET /api/runs` returns compact run summaries.
+- `GET /api/runs/:id` returns one complete stored trace.
 

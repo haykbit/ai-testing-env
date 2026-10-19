@@ -20,6 +20,12 @@ importers:
 
   packages/core: {}
 
+  packages/web:
+    dependencies:
+      '@ai-testing-env/core':
+        specifier: workspace:*
+        version: link:../core
+
 packages:
 
   '@esbuild/aix-ppc64@0.28.2':
