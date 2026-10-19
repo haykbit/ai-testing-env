@@ -1,7 +1,10 @@
 import { resolve } from "node:path";
 import type { RunTrace } from "@ai-testing-env/core";
 import { loadProject } from "./config-loader.js";
-import { runProjectScenario } from "./run-project-scenario.js";
+import {
+  runProjectSuite,
+  type RunSuiteResult,
+} from "./run-project-suite.js";
 
 export interface CliIo {
   stdout: Pick<NodeJS.WriteStream, "write">;
@@ -34,11 +37,11 @@ export async function runCli(
         : { configPath: command.configPath }),
     });
     const runsDirectory = resolve(cwd, command.runsDirectory ?? ".ai-test/runs");
-    const run = await runProjectScenario(project, command.scenarioId, {
+    const result = await runProjectSuite(project, command.selector, {
       runsDirectory,
     });
-    io.stdout.write(formatRun(run));
-    return exitCodeFor(run);
+    io.stdout.write(command.json ? formatJson(result) : formatSuite(result));
+    return exitCodeFor(result);
   } catch (error) {
     io.stderr.write(`error: ${errorMessage(error)}\n`);
     return 2;
@@ -49,9 +52,14 @@ type Command =
   | { kind: "help" }
   | {
       kind: "run";
-      scenarioId: string;
+      selector: {
+        scenarioId?: string;
+        flowId?: string;
+        tags?: string[];
+      };
       configPath?: string;
       runsDirectory?: string;
+      json: boolean;
     };
 
 function parseCommand(args: readonly string[]): Command {
@@ -62,33 +70,84 @@ function parseCommand(args: readonly string[]): Command {
     throw new Error(`Unknown command: ${args[0]}`);
   }
 
-  const scenarioId = args[1];
-  if (scenarioId === undefined || scenarioId.startsWith("-")) {
-    throw new Error("Usage: ai-test run <scenario-id>");
-  }
-
+  let scenarioId: string | undefined;
+  let flowId: string | undefined;
+  const tags: string[] = [];
   let configPath: string | undefined;
   let runsDirectory: string | undefined;
-  for (let index = 2; index < args.length; index += 1) {
+  let json = false;
+  for (let index = 1; index < args.length; index += 1) {
     const argument = args[index];
     const value = args[index + 1];
-    if (argument === "--config" && value !== undefined) {
-      configPath = value;
+    if (argument === "--flow") {
+      flowId = optionValue(argument, value);
       index += 1;
-    } else if (argument === "--runs-dir" && value !== undefined) {
-      runsDirectory = value;
+    } else if (argument === "--tag") {
+      tags.push(optionValue(argument, value));
       index += 1;
+    } else if (argument === "--config") {
+      configPath = optionValue(argument, value);
+      index += 1;
+    } else if (argument === "--runs-dir") {
+      runsDirectory = optionValue(argument, value);
+      index += 1;
+    } else if (argument === "--json") {
+      json = true;
+    } else if (argument !== undefined && !argument.startsWith("-") && scenarioId === undefined) {
+      scenarioId = argument;
     } else {
       throw new Error(`Unknown option: ${argument}`);
     }
   }
 
+  if (scenarioId !== undefined && (flowId !== undefined || tags.length > 0)) {
+    throw new Error("A Scenario id cannot be combined with --flow or --tag");
+  }
+  if (scenarioId === undefined && flowId === undefined && tags.length === 0) {
+    throw new Error("Select a Scenario id, --flow, or at least one --tag");
+  }
+
   return {
     kind: "run",
-    scenarioId,
+    selector: {
+      ...(scenarioId === undefined ? {} : { scenarioId }),
+      ...(flowId === undefined ? {} : { flowId }),
+      ...(tags.length === 0 ? {} : { tags }),
+    },
     ...(configPath === undefined ? {} : { configPath }),
     ...(runsDirectory === undefined ? {} : { runsDirectory }),
+    json,
   };
+}
+
+function optionValue(option: string, value: string | undefined): string {
+  if (value === undefined || value.startsWith("-")) {
+    throw new Error(`Missing value for ${option}`);
+  }
+  return value;
+}
+
+function formatSuite(result: RunSuiteResult): string {
+  return [
+    ...result.runs.map(formatRun),
+    `Summary: ${result.summary.passed} passed, ${result.summary.failed} failed, ${result.summary.errored} errored`,
+    "",
+  ].join("\n");
+}
+
+function formatJson(result: RunSuiteResult): string {
+  return `${JSON.stringify({
+    schemaVersion: 1,
+    summary: result.summary,
+    runs: result.runs.map((run) => ({
+      id: run.id,
+      projectId: run.projectId,
+      flowId: run.flowId,
+      scenarioId: run.scenarioId,
+      status: run.status,
+      durationMs: run.durationMs,
+    })),
+  })}\n`;
 }
 
 function formatRun(run: RunTrace): string {
@@ -125,10 +184,10 @@ function formatRun(run: RunTrace): string {
   ].join("\n");
 }
 
-function exitCodeFor(run: RunTrace): number {
-  if (run.status === "passed") return 0;
-  if (run.status === "failed") return 1;
-  return 2;
+function exitCodeFor(result: RunSuiteResult): number {
+  if (result.summary.errored > 0) return 2;
+  if (result.summary.failed > 0) return 1;
+  return 0;
 }
 
 function errorMessage(error: unknown): string {
@@ -138,5 +197,6 @@ function errorMessage(error: unknown): string {
 const helpText = `ai-testing-env
 
 Usage:
-  ai-test run <scenario-id> [--config <path>] [--runs-dir <path>]
+  ai-test run <scenario-id> [--json] [--config <path>] [--runs-dir <path>]
+  ai-test run [--flow <flow-id>] [--tag <tag>...] [--json]
 `;

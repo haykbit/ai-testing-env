@@ -122,6 +122,97 @@ describe("ai-test run", () => {
       { code: "ENOENT" },
     );
   });
+
+  it("selects a suite by Flow and tags and emits stable JSON", async () => {
+    const projectDirectory = await createProject(`
+      export default {
+        id: "suite-project",
+        flows: [
+          { id: "publish", execute: (_context: any, input: string) => input },
+          { id: "moderate", execute: (_context: any, input: string) => input },
+        ],
+        scenarios: [
+          { id: "publish-fast", flowId: "publish", input: "fast", tags: ["smoke"] },
+          { id: "publish-full", flowId: "publish", input: "full", tags: ["smoke", "slow"] },
+          { id: "moderate-fast", flowId: "moderate", input: "safe", tags: ["smoke"] },
+        ],
+      };
+    `);
+
+    const result = await runCliProcess(projectDirectory, [
+      "run",
+      "--flow",
+      "publish",
+      "--tag",
+      "smoke",
+      "--json",
+    ]);
+
+    assert.equal(result.code, 0);
+    assert.equal(result.stderr, "");
+    const payload = JSON.parse(result.stdout) as {
+      schemaVersion: number;
+      summary: Record<string, number>;
+      runs: Array<Record<string, unknown> & { scenarioId: string }>;
+    };
+    assert.equal(payload.schemaVersion, 1);
+    assert.deepEqual(payload.summary, {
+      total: 2,
+      passed: 2,
+      failed: 0,
+      errored: 0,
+    });
+    assert.deepEqual(Object.keys(payload.runs[0] ?? {}).sort(), [
+      "durationMs",
+      "flowId",
+      "id",
+      "projectId",
+      "scenarioId",
+      "status",
+    ]);
+    assert.deepEqual(
+      payload.runs.map((run) => run.scenarioId),
+      ["publish-fast", "publish-full"],
+    );
+    assert.equal((await storedRuns(projectDirectory)).length, 2);
+  });
+
+  it("persists later Runs when an earlier Scenario errors", async () => {
+    const projectDirectory = await createProject(`
+      export default {
+        id: "suite-project",
+        flows: [{
+          id: "process",
+          execute: (context: any, input: string) => context.step(
+            { id: "work", kind: "code", input },
+            () => {
+              if (input === "explode") throw new Error("boom");
+              return input;
+            },
+          ),
+        }],
+        scenarios: [
+          { id: "first-errors", flowId: "process", input: "explode", tags: ["ci"] },
+          { id: "second-passes", flowId: "process", input: "safe", tags: ["ci"] },
+        ],
+      };
+    `);
+
+    const result = await runCliProcess(projectDirectory, [
+      "run",
+      "--tag",
+      "ci",
+    ]);
+
+    assert.equal(result.code, 2);
+    assert.match(result.stdout, /ERROR first-errors/);
+    assert.match(result.stdout, /PASS second-passes/);
+    assert.match(result.stdout, /Summary: 1 passed, 0 failed, 1 errored/);
+    assert.deepEqual(
+      (await storedRuns(projectDirectory)).map((run) => run.status).sort(),
+      ["errored", "passed"],
+    );
+  });
 });
 
 async function createProject(config: string): Promise<string> {
@@ -145,6 +236,13 @@ async function onlyStoredRun(projectDirectory: string): Promise<RunTrace> {
   const raw = await readFile(join(runsDirectory, entries[0]!), "utf8");
   assert.equal(JSON.parse(raw).id, run.id);
   return run;
+}
+
+async function storedRuns(projectDirectory: string): Promise<RunTrace[]> {
+  const repository = new FileRunRepository(
+    join(projectDirectory, ".ai-test", "runs"),
+  );
+  return repository.list();
 }
 
 interface ProcessResult {
