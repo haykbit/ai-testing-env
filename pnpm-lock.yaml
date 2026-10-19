@@ -18,6 +18,25 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
+  examples/basic-backend:
+    dependencies:
+      ai-testing-env:
+        specifier: workspace:*
+        version: link:../../packages/cli
+
+  packages/cli:
+    dependencies:
+      '@ai-testing-env/core':
+        specifier: workspace:*
+        version: link:../core
+      tsx:
+        specifier: ^4.19.2
+        version: 4.23.15
+    devDependencies:
+      esbuild:
+        specifier: ^0.28.0
+        version: 0.28.2
+
   packages/core: {}
 
   packages/web:

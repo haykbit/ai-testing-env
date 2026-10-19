@@ -6,7 +6,7 @@
   "scripts": {
     "build": "pnpm --filter './packages/**' build",
     "test": "pnpm --filter './packages/**' test",
-    "typecheck": "pnpm --filter './packages/**' typecheck",
+    "typecheck": "pnpm --filter './packages/**' typecheck && pnpm --filter './examples/**' typecheck",
     "check": "pnpm typecheck && pnpm test && pnpm build",
     "dev": "tilt up"
   },

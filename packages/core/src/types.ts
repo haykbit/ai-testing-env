@@ -91,8 +91,8 @@ export interface ScenarioDefinition<TInput = unknown> {
 
 export interface ProjectDefinition {
   id: string;
-  flows: readonly FlowDefinition[];
-  scenarios: readonly ScenarioDefinition[];
+  flows: readonly FlowDefinition<any, any>[];
+  scenarios: readonly ScenarioDefinition<any>[];
 }
 
 export interface RunRepository {

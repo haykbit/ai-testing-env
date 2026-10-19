@@ -1,0 +1,25 @@
+{
+  "name": "ai-testing-env",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ai-test": "./dist/bin.js",
+    "ai-testing-env": "./dist/bin.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && esbuild src/bin.ts --bundle --platform=node --format=esm --target=node20 --external:tsx --external:tsx/* --outfile=dist/bin.js",
+    "test": "tsx --test src/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ai-testing-env/core": "workspace:*",
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0"
+  }
+}
