@@ -1,16 +1,18 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { RunRepository, RunTrace } from "./types.js";
+import { redactRunTrace } from "./redaction.js";
 
 export class FileRunRepository implements RunRepository {
   constructor(private readonly directory: string) {}
 
   async save(run: RunTrace): Promise<void> {
     assertSafeRunId(run.id);
+    const redactedRun = redactRunTrace(run);
     await mkdir(this.directory, { recursive: true });
     await writeFile(
       join(this.directory, `${run.id}.json`),
-      `${JSON.stringify(run, null, 2)}\n`,
+      `${JSON.stringify(redactedRun, null, 2)}\n`,
       "utf8",
     );
   }
@@ -42,14 +44,14 @@ export class FileRunRepository implements RunRepository {
 
   private async read(path: string): Promise<RunTrace> {
     const stored = JSON.parse(await readFile(path, "utf8")) as RunTrace;
-    return {
+    return redactRunTrace({
       ...stored,
       profileId: stored.profileId ?? "mocked",
       steps: stored.steps.map((step) => ({
         ...step,
         capabilities: step.capabilities ?? [],
       })),
-    };
+    });
   }
 }
 

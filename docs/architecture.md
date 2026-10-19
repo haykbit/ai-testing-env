@@ -85,3 +85,16 @@ network access but denies writes and spend. `live` is the only built-in Profile
 that can permit all three; provider-specific live operations add their own
 explicit authorization requirements.
 
+## Trace redaction
+
+Redaction happens before a completed Trace reaches any RunRepository. Built-in
+rules protect common credential keys such as authorization headers, cookies,
+API keys, tokens, passwords, and secrets. A Project can add sensitive keys and
+literal values without disabling the base rules. URL credentials and sensitive
+query parameters are redacted as part of the same recursive pass.
+
+FileRunRepository repeats the base redaction on write and read as defense in
+depth, including for legacy files. CLI, API, and dashboard therefore consume
+the already-redacted evidence rather than hiding secrets only at presentation
+time.
+

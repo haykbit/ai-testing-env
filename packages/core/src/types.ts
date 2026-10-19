@@ -18,6 +18,12 @@ export interface ExecutionProfile {
   capabilities: ResourcePolicy;
 }
 
+export interface RedactionConfig {
+  sensitiveKeys?: readonly string[];
+  sensitiveValues?: readonly string[];
+  replacement?: string;
+}
+
 export interface EvaluationResult {
   name: string;
   passed: boolean;
@@ -114,6 +120,7 @@ export interface ProjectDefinition {
   flows: readonly FlowDefinition<any, any>[];
   scenarios: readonly ScenarioDefinition<any>[];
   profiles?: readonly ExecutionProfile[];
+  redaction?: RedactionConfig;
 }
 
 export interface RunRepository {

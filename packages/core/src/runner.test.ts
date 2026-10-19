@@ -191,7 +191,7 @@ describe("FileRunRepository", () => {
         startedAt: "2026-01-01T00:00:00.000Z",
         finishedAt: "2026-01-01T00:00:00.001Z",
         durationMs: 1,
-        input: null,
+        input: { password: "legacy-secret" },
         steps: [{
           id: "legacy-step",
           name: "legacy-step",
@@ -213,6 +213,7 @@ describe("FileRunRepository", () => {
 
     assert.equal(run?.profileId, "mocked");
     assert.deepEqual(run?.steps[0]?.capabilities, []);
+    assert.deepEqual(run?.input, { password: "[REDACTED]" });
   });
 });
 

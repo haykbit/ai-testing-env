@@ -1,6 +1,7 @@
 import {
   FileRunRepository,
   resolveExecutionProfile,
+  redactRunTrace,
   runScenario,
   type ProjectDefinition,
   type RunRepository,
@@ -41,6 +42,7 @@ export async function runProjectScenario(
   const repository = options.repository ?? new FileRunRepository(
     options.runsDirectory ?? ".ai-test/runs",
   );
-  await repository.save(run);
-  return run;
+  const redactedRun = redactRunTrace(run, project.redaction);
+  await repository.save(redactedRun);
+  return redactedRun;
 }
