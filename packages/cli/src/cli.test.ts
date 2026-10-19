@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -412,6 +412,41 @@ describe("ai-test run", () => {
       (JSON.parse(second.stdout) as { runs: RunTrace[] }).runs.map((run) => run.id),
       ["b"],
     );
+  });
+
+  it("previews deterministic init discovery before saving a proposal", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ai-testing-env-init-"));
+    temporaryDirectories.push(directory);
+    await mkdir(join(directory, "src"), { recursive: true });
+    await writeFile(
+      join(directory, "package.json"),
+      JSON.stringify({ main: "./src/server.ts", dependencies: { openai: "1" } }),
+      "utf8",
+    );
+    await writeFile(join(directory, "src", "server.ts"), "app.get('/health', handler);", "utf8");
+
+    const preview = await runCliProcess(directory, ["init", "--json"]);
+
+    assert.equal(preview.code, 0);
+    const report = JSON.parse(preview.stdout) as {
+      inventory: { aiSdks: string[]; endpoints: unknown[] };
+      proposal: { status: string };
+    };
+    assert.deepEqual(report.inventory.aiSdks, ["OpenAI"]);
+    assert.equal(report.inventory.endpoints.length, 1);
+    assert.equal(report.proposal.status, "review-required");
+    await assert.rejects(access(join(directory, ".ai-test", "config.ts")), {
+      code: "ENOENT",
+    });
+
+    const saved = await runCliProcess(directory, [
+      "init", "--save", ".ai-test/discovery.json",
+    ]);
+    assert.equal(saved.code, 0);
+    await access(join(directory, ".ai-test", "discovery.json"));
+    await assert.rejects(access(join(directory, ".ai-test", "config.ts")), {
+      code: "ENOENT",
+    });
   });
 });
 

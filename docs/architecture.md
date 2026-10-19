@@ -214,3 +214,16 @@ missing output values, added/removed/changed Steps and Evaluations, duration
 delta, and recursively observed total-token changes. Both the JSON API and HTML
 view operate on already-redacted stored Traces and never modify either Run.
 
+## Deterministic initialization
+
+`ai-test init` walks readable Project files in stable path order without
+importing or executing source and without network access. It excludes generated,
+dependency, VCS, coverage, and stored-Run directories. The inventory reports
+languages, known AI SDKs, prompt/schema files, statically recognizable HTTP
+endpoints, database clients, test tools, and existing entrypoints.
+
+The default command is a dry run. Its proposal marks every entrypoint-derived
+Flow candidate as uncertain, creates no Scenarios, and lists gaps that require
+human review instead of inventing behavior. `--save <path>` explicitly saves the
+same review-required discovery JSON; it still never creates `.ai-test/config.ts`.
+

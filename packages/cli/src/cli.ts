@@ -7,6 +7,10 @@ import {
 } from "@ai-testing-env/core";
 import { loadProject } from "./config-loader.js";
 import {
+  discoverProject,
+  type ProjectDiscoveryReport,
+} from "./discovery.js";
+import {
   runProjectSuite,
   type RunSuiteResult,
 } from "./run-project-suite.js";
@@ -44,6 +48,15 @@ export async function runCli(
       io.stdout.write(command.json
         ? `${JSON.stringify({ schemaVersion: 1, ...page })}\n`
         : formatRunPage(page.runs, page.nextCursor));
+      return 0;
+    }
+    if (command.kind === "init") {
+      const report = await discoverProject(cwd, {
+        ...(command.savePath === undefined ? {} : { savePath: command.savePath }),
+      });
+      io.stdout.write(command.json
+        ? `${JSON.stringify(report)}\n`
+        : formatDiscovery(report, command.savePath));
       return 0;
     }
 
@@ -89,6 +102,7 @@ export async function runCli(
 
 type Command =
   | { kind: "help" }
+  | { kind: "init"; savePath?: string; json: boolean }
   | {
       kind: "runs";
       query: RunQuery;
@@ -125,6 +139,7 @@ function parseCommand(args: readonly string[]): Command {
   }
   if (args[0] === "reevaluate") return parseReevaluateCommand(args.slice(1));
   if (args[0] === "runs") return parseRunsCommand(args.slice(1));
+  if (args[0] === "init") return parseInitCommand(args.slice(1));
   if (args[0] !== "run") {
     throw new Error(`Unknown command: ${args[0]}`);
   }
@@ -184,6 +199,27 @@ function parseCommand(args: readonly string[]): Command {
     ...(runsDirectory === undefined ? {} : { runsDirectory }),
     ...(profileId === undefined ? {} : { profileId }),
     allowLive,
+    json,
+  };
+}
+
+function parseInitCommand(args: readonly string[]): Command {
+  let savePath: string | undefined;
+  let json = false;
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (argument === "--save") {
+      savePath = optionValue(argument, args[index + 1]);
+      index += 1;
+    } else if (argument === "--json") {
+      json = true;
+    } else {
+      throw new Error(`Unknown option: ${argument}`);
+    }
+  }
+  return {
+    kind: "init",
+    ...(savePath === undefined ? {} : { savePath }),
     json,
   };
 }
@@ -317,6 +353,37 @@ function formatRunPage(runs: readonly RunTrace[], nextCursor?: string): string {
   ].join("\n");
 }
 
+function formatDiscovery(
+  report: ProjectDiscoveryReport,
+  savePath?: string,
+): string {
+  const list = (values: readonly string[]) => values.length === 0
+    ? "none"
+    : values.join(", ");
+  return [
+    `Project discovery: ${report.root}`,
+    `Files scanned: ${report.filesScanned}`,
+    `Languages: ${list(report.inventory.languages)}`,
+    `AI SDKs: ${list(report.inventory.aiSdks)}`,
+    `Database clients: ${list(report.inventory.databaseClients)}`,
+    `Test tools: ${list(report.inventory.testTools)}`,
+    `Prompts: ${report.inventory.prompts.length}`,
+    `Schemas: ${report.inventory.schemas.length}`,
+    `Endpoints: ${report.inventory.endpoints.length}`,
+    `Entrypoints: ${report.inventory.entrypoints.length}`,
+    "",
+    "Proposal status: review-required",
+    ...report.proposal.flowCandidates.map((candidate) =>
+      `  ? ${candidate.file} — ${candidate.reason}`
+    ),
+    ...report.proposal.uncertainties.map((uncertainty) => `  ! ${uncertainty}`),
+    savePath === undefined
+      ? "Dry run: no configuration or proposal file was written."
+      : `Saved proposal: ${savePath}`,
+    "",
+  ].join("\n");
+}
+
 function formatSuite(result: RunSuiteResult): string {
   return [
     ...result.runs.map(formatRun),
@@ -405,4 +472,5 @@ Usage:
   ai-test run [--flow <flow-id>] [--tag <tag>...] [--profile <profile-id>] [--allow-live] [--json]
   ai-test reevaluate <run-id> --evaluation <evaluation-id>... [--profile <profile-id>] [--allow-live] [--json]
   ai-test runs [--project <id>] [--flow <id>] [--scenario <id>] [--verdict <status>] [--tag <tag>...] [--from <date>] [--to <date>] [--limit <n>] [--cursor <cursor>] [--json]
+  ai-test init [--json] [--save <proposal-path>]
 `;
