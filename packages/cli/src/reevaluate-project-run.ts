@@ -2,6 +2,7 @@ import {
   FileRunRepository,
   redactRunTrace,
   reevaluateRun,
+  resolveExecutionProfile,
   type ProjectDefinition,
   type RunRepository,
   type RunTrace,
@@ -11,6 +12,8 @@ export interface ReevaluateProjectRunOptions {
   repository?: RunRepository;
   runsDirectory?: string;
   runId?: string;
+  profileId?: string;
+  allowLive?: boolean;
 }
 
 export async function reevaluateProjectRun(
@@ -39,6 +42,11 @@ export async function reevaluateProjectRun(
   });
   const result = redactRunTrace(await reevaluateRun(source, evaluators, {
     ...(options.runId === undefined ? {} : { runId: options.runId }),
+    profile: resolveExecutionProfile(
+      project,
+      options.profileId ?? source.profileId,
+    ),
+    allowLive: options.allowLive === true,
   }), project.redaction);
   await repository.save(result);
   return result;

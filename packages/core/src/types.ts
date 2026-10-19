@@ -28,9 +28,12 @@ export interface EvaluationResult {
   name: string;
   passed: boolean;
   message?: string;
+  explanation?: string;
   score?: number;
   expected?: unknown;
   actual?: unknown;
+  metadata?: Record<string, unknown>;
+  error?: SerializedError;
 }
 
 export interface EvaluationContext<T> {
@@ -99,6 +102,7 @@ export interface RunTrace {
 export interface RunEvaluator {
   id: string;
   name?: string;
+  capabilities?: readonly ResourceCapability[];
   evaluate(run: Readonly<RunTrace>): EvaluationResult | Promise<EvaluationResult>;
 }
 

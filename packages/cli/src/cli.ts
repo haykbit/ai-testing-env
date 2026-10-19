@@ -43,7 +43,13 @@ export async function runCli(
         project,
         command.sourceRunId,
         command.evaluationIds,
-        { runsDirectory },
+        {
+          runsDirectory,
+          ...(command.profileId === undefined
+            ? {}
+            : { profileId: command.profileId }),
+          allowLive: command.allowLive,
+        },
       );
       io.stdout.write(command.json
         ? `${JSON.stringify({ schemaVersion: 1, run })}\n`
@@ -73,6 +79,8 @@ type Command =
       evaluationIds: string[];
       configPath?: string;
       runsDirectory?: string;
+      profileId?: string;
+      allowLive: boolean;
       json: boolean;
     }
   | {
@@ -162,6 +170,8 @@ function parseReevaluateCommand(args: readonly string[]): Command {
   const evaluationIds: string[] = [];
   let configPath: string | undefined;
   let runsDirectory: string | undefined;
+  let profileId: string | undefined;
+  let allowLive = false;
   let json = false;
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
@@ -175,6 +185,11 @@ function parseReevaluateCommand(args: readonly string[]): Command {
     } else if (argument === "--runs-dir") {
       runsDirectory = optionValue(argument, value);
       index += 1;
+    } else if (argument === "--profile") {
+      profileId = optionValue(argument, value);
+      index += 1;
+    } else if (argument === "--allow-live") {
+      allowLive = true;
     } else if (argument === "--json") {
       json = true;
     } else if (argument !== undefined && !argument.startsWith("-") && sourceRunId === undefined) {
@@ -196,6 +211,8 @@ function parseReevaluateCommand(args: readonly string[]): Command {
     evaluationIds,
     ...(configPath === undefined ? {} : { configPath }),
     ...(runsDirectory === undefined ? {} : { runsDirectory }),
+    ...(profileId === undefined ? {} : { profileId }),
+    allowLive,
     json,
   };
 }
@@ -293,5 +310,5 @@ const helpText = `ai-testing-env
 Usage:
   ai-test run <scenario-id> [--profile <profile-id>] [--allow-live] [--json]
   ai-test run [--flow <flow-id>] [--tag <tag>...] [--profile <profile-id>] [--allow-live] [--json]
-  ai-test reevaluate <run-id> --evaluation <evaluation-id>... [--json]
+  ai-test reevaluate <run-id> --evaluation <evaluation-id>... [--profile <profile-id>] [--allow-live] [--json]
 `;

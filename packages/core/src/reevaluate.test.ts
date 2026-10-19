@@ -47,11 +47,12 @@ describe("reevaluateRun", () => {
       },
     }]);
 
-    assert.equal(result.status, "failed");
+    assert.equal(result.status, "errored");
     assert.deepEqual(result.evaluations, [{
       name: "broken",
       passed: false,
       message: "Evaluator errored: invalid rule",
+      error: { name: "Error", message: "invalid rule" },
     }]);
   });
 });

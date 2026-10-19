@@ -1,14 +1,22 @@
 import { randomUUID } from "node:crypto";
 import type {
   EvaluationResult,
+  ExecutionProfile,
   RunEvaluator,
   RunTrace,
   SerializedError,
 } from "./types.js";
+import {
+  assertCapabilitiesAllowed,
+  assertLiveExecutionAuthorized,
+  defaultExecutionProfile,
+} from "./profiles.js";
 
 export interface ReevaluateRunOptions {
   runId?: string;
   now?: () => Date;
+  profile?: ExecutionProfile;
+  allowLive?: boolean;
 }
 
 export async function reevaluateRun(
@@ -19,10 +27,18 @@ export async function reevaluateRun(
   const now = options.now ?? (() => new Date());
   const startedAt = now();
   const immutableSource = deepFreeze(structuredClone(source));
+  const profile = options.profile ?? defaultExecutionProfile;
   const evaluations: EvaluationResult[] = [];
 
   for (const evaluator of evaluators) {
     try {
+      const capabilities = evaluator.capabilities ?? [];
+      assertCapabilitiesAllowed(profile, capabilities);
+      assertLiveExecutionAuthorized(
+        profile,
+        capabilities,
+        options.allowLive === true,
+      );
       const result = await evaluator.evaluate(immutableSource);
       evaluations.push({ ...result, name: evaluator.name ?? result.name });
     } catch (error) {
@@ -31,6 +47,7 @@ export async function reevaluateRun(
         name: evaluator.name ?? evaluator.id,
         passed: false,
         message: `Evaluator errored: ${serialized.message}`,
+        error: serialized,
       });
     }
   }
@@ -43,9 +60,11 @@ export async function reevaluateRun(
     profileId: source.profileId,
     flowId: source.flowId,
     scenarioId: source.scenarioId,
-    status: evaluations.every((evaluation) => evaluation.passed)
-      ? "passed"
-      : "failed",
+    status: evaluations.some((evaluation) => evaluation.error !== undefined)
+      ? "errored"
+      : evaluations.every((evaluation) => evaluation.passed)
+        ? "passed"
+        : "failed",
     startedAt: startedAt.toISOString(),
     finishedAt: finishedAt.toISOString(),
     durationMs: finishedAt.getTime() - startedAt.getTime(),

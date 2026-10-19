@@ -171,3 +171,18 @@ evidence through the same redaction and repository boundary. The API includes
 `sourceRunId` in summaries and the dashboard links each reevaluation back to its
 source Run.
 
+## Recorded model judges
+
+`createModelJudge` turns the common AI adapter into a Run Evaluation. Each judge
+declares a rubric id and version, numeric scale, passing threshold, instructions,
+and model. Stored evidence includes score, explanation, model/provider/mode,
+rubric identity, token usage, latency, and provider response id when available.
+
+Judge capabilities come from the AI adapter and are checked by reevaluation
+before the adapter is invoked. Live judges therefore require Project
+`allowLive`, the live Profile, and invocation `--allow-live`; replay judges have
+no external capabilities. Wrapping a live adapter in recording and later using
+replay makes the judgment reproducible without another paid call. A below-
+threshold judgment yields `failed`; transport, policy, or malformed-judge
+responses yield `errored` evidence instead.
+
