@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   assertCapabilitiesAllowed,
+  assertLiveExecutionAuthorized,
   builtInProfiles,
   defineFlow,
   defineProject,
@@ -66,6 +67,21 @@ describe("execution Profiles", () => {
     assert.deepEqual(run.steps[0]?.capabilities, ["network"]);
     assert.equal(run.steps[0]?.error?.name, "ProfilePolicyError");
     assert.match(run.steps[0]?.error?.message ?? "", /does not allow: network/);
+  });
+
+  it("requires invocation authorization before a live operation", async () => {
+    const live = builtInProfiles.find((profile) => profile.id === "live")!;
+
+    assert.throws(
+      () => assertLiveExecutionAuthorized(live, ["network", "spend"], false),
+      /pass --allow-live/,
+    );
+    assert.doesNotThrow(() =>
+      assertLiveExecutionAuthorized(live, ["network", "spend"], true),
+    );
+    assert.doesNotThrow(() =>
+      assertLiveExecutionAuthorized(live, [], false),
+    );
   });
 
   it("validates Profile identifiers referenced by a Project", () => {

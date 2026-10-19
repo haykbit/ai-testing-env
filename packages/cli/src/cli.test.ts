@@ -256,6 +256,77 @@ describe("ai-test run", () => {
       ["integration", "recorded"],
     );
   });
+
+  it("requires project and invocation authorization for live execution", async () => {
+    const projectWithoutAuthorization = await createProject(`
+      export default {
+        id: "live-project",
+        flows: [{
+          id: "request",
+          execute: (context: any) => context.step(
+            { id: "paid-request", kind: "ai", capabilities: ["network", "spend"] },
+            () => "response",
+          ),
+        }],
+        scenarios: [{ id: "live", flowId: "request", input: null }],
+      };
+    `);
+
+    const projectBlocked = await runCliProcess(projectWithoutAuthorization, [
+      "run",
+      "live",
+      "--profile",
+      "live",
+      "--allow-live",
+    ]);
+    assert.equal(projectBlocked.code, 2);
+    assert.match(projectBlocked.stderr, /set allowLive: true/);
+
+    const authorizedProject = await createProject(`
+      import { appendFile } from "node:fs/promises";
+      export default {
+        id: "live-project",
+        allowLive: true,
+        flows: [{
+          id: "request",
+          execute: (context: any) => context.step(
+            { id: "paid-request", kind: "ai", capabilities: ["network", "spend"] },
+            async () => {
+              await appendFile("operation-called", "yes");
+              return "response";
+            },
+          ),
+        }],
+        scenarios: [{ id: "live", flowId: "request", input: null }],
+      };
+    `);
+
+    const invocationBlocked = await runCliProcess(authorizedProject, [
+      "run",
+      "live",
+      "--profile",
+      "live",
+    ]);
+    assert.equal(invocationBlocked.code, 2);
+    assert.match(invocationBlocked.stdout, /pass --allow-live/);
+    await assert.rejects(readFile(join(authorizedProject, "operation-called")), {
+      code: "ENOENT",
+    });
+
+    const allowed = await runCliProcess(authorizedProject, [
+      "run",
+      "live",
+      "--profile",
+      "live",
+      "--allow-live",
+    ]);
+    assert.equal(allowed.code, 0);
+    assert.match(allowed.stdout, /PASS live \[live\]/);
+    assert.equal(
+      await readFile(join(authorizedProject, "operation-called"), "utf8"),
+      "yes",
+    );
+  });
 });
 
 async function createProject(config: string): Promise<string> {

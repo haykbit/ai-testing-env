@@ -42,6 +42,7 @@ export async function runCli(
       ...(command.profileId === undefined
         ? {}
         : { profileId: command.profileId }),
+      allowLive: command.allowLive,
     });
     io.stdout.write(command.json ? formatJson(result) : formatSuite(result));
     return exitCodeFor(result);
@@ -63,6 +64,7 @@ type Command =
       configPath?: string;
       runsDirectory?: string;
       profileId?: string;
+      allowLive: boolean;
       json: boolean;
     };
 
@@ -80,6 +82,7 @@ function parseCommand(args: readonly string[]): Command {
   let configPath: string | undefined;
   let runsDirectory: string | undefined;
   let profileId: string | undefined;
+  let allowLive = false;
   let json = false;
   for (let index = 1; index < args.length; index += 1) {
     const argument = args[index];
@@ -101,6 +104,8 @@ function parseCommand(args: readonly string[]): Command {
       index += 1;
     } else if (argument === "--json") {
       json = true;
+    } else if (argument === "--allow-live") {
+      allowLive = true;
     } else if (argument !== undefined && !argument.startsWith("-") && scenarioId === undefined) {
       scenarioId = argument;
     } else {
@@ -125,6 +130,7 @@ function parseCommand(args: readonly string[]): Command {
     ...(configPath === undefined ? {} : { configPath }),
     ...(runsDirectory === undefined ? {} : { runsDirectory }),
     ...(profileId === undefined ? {} : { profileId }),
+    allowLive,
     json,
   };
 }
@@ -207,6 +213,6 @@ function errorMessage(error: unknown): string {
 const helpText = `ai-testing-env
 
 Usage:
-  ai-test run <scenario-id> [--profile <profile-id>] [--json]
-  ai-test run [--flow <flow-id>] [--tag <tag>...] [--profile <profile-id>] [--json]
+  ai-test run <scenario-id> [--profile <profile-id>] [--allow-live] [--json]
+  ai-test run [--flow <flow-id>] [--tag <tag>...] [--profile <profile-id>] [--allow-live] [--json]
 `;

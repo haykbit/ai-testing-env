@@ -17,6 +17,7 @@ export interface RunProjectSuiteOptions {
   repository?: RunRepository;
   runsDirectory?: string;
   profileId?: string;
+  allowLive?: boolean;
 }
 
 export interface RunSuiteSummary {
@@ -49,6 +50,7 @@ export async function runProjectSuite(
         ...(options.profileId === undefined
           ? {}
           : { profileId: options.profileId }),
+        allowLive: options.allowLive === true,
       }),
     );
   }

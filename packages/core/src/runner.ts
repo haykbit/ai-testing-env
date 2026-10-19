@@ -12,6 +12,7 @@ import type {
 } from "./types.js";
 import {
   assertCapabilitiesAllowed,
+  assertLiveExecutionAuthorized,
   defaultExecutionProfile,
 } from "./profiles.js";
 
@@ -20,6 +21,7 @@ export interface RunOptions {
   runId?: string;
   now?: () => Date;
   profile?: ExecutionProfile;
+  allowLive?: boolean;
 }
 
 async function runEvaluators<T>(
@@ -81,6 +83,11 @@ export async function runScenario<TInput, TOutput>(
           const capabilities = [...(definition.capabilities ?? [])];
           try {
             assertCapabilitiesAllowed(profile, capabilities);
+            assertLiveExecutionAuthorized(
+              profile,
+              capabilities,
+              options.allowLive === true,
+            );
             const value = await operation();
             const stepEvaluations = await runEvaluators(
               definition.evaluators ?? [],

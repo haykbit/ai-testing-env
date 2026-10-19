@@ -61,7 +61,24 @@ export function resolveExecutionProfile(
   if (profile === undefined) {
     throw new Error(`Unknown Profile: ${profileId}`);
   }
+  if (profile.mode === "live" && project.allowLive !== true) {
+    throw new LiveExecutionAuthorizationError(
+      `Project ${project.id} does not allow live execution; set allowLive: true in its configuration`,
+    );
+  }
   return profile;
+}
+
+export function assertLiveExecutionAuthorized(
+  profile: ExecutionProfile,
+  capabilities: readonly ResourceCapability[],
+  allowLive: boolean,
+): void {
+  if (profile.mode === "live" && capabilities.length > 0 && !allowLive) {
+    throw new LiveExecutionAuthorizationError(
+      "Live execution requires explicit invocation authorization; pass --allow-live",
+    );
+  }
 }
 
 export function assertCapabilitiesAllowed(
@@ -90,5 +107,12 @@ export class ProfilePolicyError extends Error {
     this.name = "ProfilePolicyError";
     this.profileId = profileId;
     this.deniedCapabilities = deniedCapabilities;
+  }
+}
+
+export class LiveExecutionAuthorizationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "LiveExecutionAuthorizationError";
   }
 }

@@ -13,6 +13,7 @@ export interface RunProjectScenarioOptions {
   runsDirectory?: string;
   runId?: string;
   profileId?: string;
+  allowLive?: boolean;
 }
 
 export async function runProjectScenario(
@@ -38,6 +39,7 @@ export async function runProjectScenario(
       options.profileId ?? scenario.profileId,
     ),
     ...(options.runId === undefined ? {} : { runId: options.runId }),
+    allowLive: options.allowLive === true,
   });
   const repository = options.repository ?? new FileRunRepository(
     options.runsDirectory ?? ".ai-test/runs",

@@ -120,6 +120,7 @@ export interface ProjectDefinition {
   flows: readonly FlowDefinition<any, any>[];
   scenarios: readonly ScenarioDefinition<any>[];
   profiles?: readonly ExecutionProfile[];
+  allowLive?: boolean;
   redaction?: RedactionConfig;
 }
 

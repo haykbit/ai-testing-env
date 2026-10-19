@@ -82,8 +82,10 @@ Profile denies them.
 
 `mocked` and `recorded` deny all external capabilities. `integration` permits
 network access but denies writes and spend. `live` is the only built-in Profile
-that can permit all three; provider-specific live operations add their own
-explicit authorization requirements.
+that can permit all three. A live Step with external capabilities runs only when
+the Project sets `allowLive: true` and the current invocation also passes
+`--allow-live`. Either missing authorization blocks the operation before it can
+access the network.
 
 ## Trace redaction
 
@@ -109,4 +111,22 @@ Mocks have no external capabilities. Recording wraps another adapter and saves
 a redacted fixture under a stable SHA-256 key derived from the canonical,
 redacted request. Replay reads that fixture without invoking an external
 transport. Missing and corrupt fixtures fail with dedicated, actionable errors.
+
+### OpenAI live provider
+
+`OpenAIResponsesAdapter` implements the common AI port with the OpenAI Responses
+API. It records normalized text, structured output, tool calls, latency, token
+usage, and provider response id. Requests set `store: false`, do not retry, and
+never put the API key in Step input or output.
+
+Configure credentials in the process environment and opt in at both levels:
+
+```sh
+export OPENAI_API_KEY="..."
+ai-test run live-answer --profile live --allow-live
+```
+
+The Project must also contain `allowLive: true`. Treat live runs as paid,
+networked execution: scope credentials narrowly, keep them out of source and
+fixtures, and use mocked or replayed adapters for routine local and CI tests.
 
