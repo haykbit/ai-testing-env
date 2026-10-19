@@ -130,3 +130,16 @@ The Project must also contain `allowLive: true`. Treat live runs as paid,
 networked execution: scope credentials narrowly, keep them out of source and
 fixtures, and use mocked or replayed adapters for routine local and CI tests.
 
+## HTTP adapter evidence and replay
+
+`@ai-testing-env/adapter-http` exposes one HTTP port for mocked, recorded,
+replayed, and integration execution. Mock and replay have no external
+capabilities. The fetch-backed integration adapter declares `network`, so the
+runner checks the active Profile before opening a connection.
+
+HTTP Steps capture method, redacted URL, allowlisted request and response
+headers, body, status, and duration in the normal Trace. Recorded fixtures use a
+stable key derived from the canonical redacted request; replay performs no
+network access. Non-2xx statuses remain observable responses, while transport,
+invalid JSON, and missing-fixture failures become Step errors.
+

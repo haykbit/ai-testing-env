@@ -30,6 +30,12 @@ importers:
         specifier: workspace:*
         version: link:../core
 
+  packages/adapter-http:
+    dependencies:
+      '@ai-testing-env/core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/cli:
     dependencies:
       '@ai-testing-env/core':
